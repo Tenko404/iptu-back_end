@@ -1,2 +1,3 @@
-# iptu-back_end
-back-end do sistema de IPTU para a Prefeitura de Vassouras
+# Back-end Sistema de IPTU
+
+Software Web para Recadastramento de imóveis da prefeitura de Vassouras.
