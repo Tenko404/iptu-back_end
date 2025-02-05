@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
+const path = require("path");
 const db = require("./db");
 
 const app = express();
@@ -10,10 +11,42 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ dest: "uploads/" });
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, "public")));
+
+// Set up storage for uploaded files
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "public/uploads"));
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage: storage });
 
 app.get("/", (req, res) => {
   res.send("API de Cadastro de Imóveis rodando!");
+});
+
+// Endpoint to upload property images
+app.post("/upload", upload.array("photos", 2), (req, res) => {
+  const files = req.files;
+  if (!files) {
+    return res.status(400).send("No files were uploaded.");
+  }
+  res.send(files.map((file) => `/uploads/${file.filename}`));
+});
+
+// Endpoint to retrieve property details
+app.get("/properties", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM properties");
+    res.json(rows);
+  } catch (error) {
+    res.status(500).send("Error retrieving properties");
+  }
 });
 
 app.post(
