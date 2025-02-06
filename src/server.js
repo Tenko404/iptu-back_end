@@ -46,12 +46,22 @@ app.post("/upload", upload.array("photos", 2), (req, res) => {
 });
 
 // Endpoint para recuperar os detalhes de todas as propriedades cadastradas
-app.get("/properties", async (req, res) => {
+app.get("/properties/:id", async (req, res) => {
+  const { id } = req.params; // Pega o ID enviado na URL
+
   try {
-    const [rows] = await db.query("SELECT * FROM properties"); // Executa uma consulta para selecionar todas as propriedades
-    res.json(rows);
+    const [rows] = await db.query("SELECT * FROM properties WHERE id = ?", [
+      id,
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Propriedade não encontrada" });
+    }
+
+    res.json(rows[0]); // Retorna o primeiro imóvel encontrado
   } catch (error) {
-    res.status(500).send("Erro ao recuperar propriedades");
+    console.error("Erro ao buscar propriedade:", error);
+    res.status(500).send("Erro ao buscar propriedade");
   }
 });
 
@@ -138,37 +148,13 @@ app.post("/login", (req, res) => {
 app.post(
   "/properties",
   upload.fields([{ name: "front_photo" }, { name: "above_photo" }]),
-  (req, res) => {
-    const {
+  async (req, res) => {
+    try {
       // Extrai os dados da propriedade do corpo da requisição
-      zip_code,
-      street,
-      number,
-      neighborhood,
-      complement,
-      city,
-      state,
-      property_registration,
-      tax_type,
-      land_area,
-      built_area,
-      owner_name,
-      owner_cpf_cnpj,
-      possessor_name,
-      possessor_cpf_cnpj,
-    } = req.body;
-
-    // Extrai os caminhos das imagens enviadas
-    const front_photo = req.files.front_photo[0].path;
-    const above_photo = req.files.above_photo[0].path;
-
-    // Insere os dados da propriedade no banco de dados
-    db.query(
-      "INSERT INTO properties (zip_code, street, number, neighborhood, complement, city, state, property_registration, tax_type, land_area, built_area, front_photo, above_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
+      const {
         zip_code,
         street,
-        number,
+        house_number, // Corrigido de "number" para "house_number"
         neighborhood,
         complement,
         city,
@@ -176,19 +162,30 @@ app.post(
         property_registration,
         tax_type,
         land_area,
-        built_area,
-        front_photo,
-        above_photo,
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Erro ao inserir propriedade:", err);
-          return res.status(500).send("Erro ao inserir propriedade");
-        }
+        built_area
+      } = req.body;
 
-        // Recupera o ID da propriedade recém-criada
-        const property_id = result.insertId;
+      // Verifica se as imagens foram enviadas corretamente antes de acessar
+      const front_photo = req.files?.front_photo ? req.files.front_photo[0].path : null;
+      const above_photo = req.files?.above_photo ? req.files.above_photo[0].path : null;
 
+      // Insere os dados da propriedade no banco de dados
+      const [result] = await db.query(
+        "INSERT INTO properties (zip_code, street, house_number, neighborhood, complement, city, state, property_registration, tax_type, land_area, built_area, front_photo, above_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          zip_code,
+          street,
+          house_number,
+          neighborhood,
+          complement || null, // Permite null se não enviado
+          city,
+          state,
+          property_registration,
+          tax_type,
+          land_area,
+          built_area,
+          front_photo || null,
+          above_photo || null
         // Se os dados do proprietário foram enviados, insere na tabela "owners"
         if (owner_name && owner_cpf_cnpj) {
           db.query(
