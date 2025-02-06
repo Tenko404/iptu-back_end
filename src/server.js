@@ -1,10 +1,12 @@
-require("dotenv").config(); // Carrega as variáveis de ambiente do arquivo .env
+require("dotenv").config({
+  path: require("path").resolve(__dirname, "../.env"),
+}); // Carrega as variáveis de ambiente do arquivo .env
 const bcrypt = require("bcryptjs"); // Importa o bcryptjs para manipulação de senhas (hashing e comparação)
 const express = require("express"); // Importa o Express para criar o servidor e definir rotas
 const cors = require("cors"); // Importa o CORS para permitir requisições de diferentes origens
 const multer = require("multer"); // Importa o Multer para gerenciar uploads de arquivos
 const path = require("path"); // Importa o módulo path para trabalhar com caminhos de arquivos
-const db = require("./db"); // Importa o módulo de conexão com o banco de dados
+const db = require("./config/db"); // Importa o módulo de conexão com o banco de dados
 
 const app = express(); // Cria a aplicação Express
 const port = process.env.PORT || 3000; // Define a porta que o servidor irá usar (padrão 3000 ou conforme variável de ambiente)
