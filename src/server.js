@@ -35,6 +35,22 @@ app.get("/", (req, res) => {
   res.send("API de Cadastro de Imóveis rodando!");
 });
 
+// Endpoint para listar todas as propriedades
+app.get("/properties", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM properties");
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Nenhuma propriedade encontrada" });
+    }
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Erro ao buscar propriedades:", error);
+    res.status(500).send("Erro ao buscar propriedades");
+  }
+});
+
 // Endpoint para upload de imagens de propriedade
 // Permite o upload de até 2 arquivos no campo "photos"
 app.post("/upload", upload.array("photos", 2), (req, res) => {
@@ -145,16 +161,16 @@ app.post("/login", (req, res) => {
 
 // Endpoint para registrar uma propriedade com upload de imagens
 // Recebe dois campos de upload: "front_photo" e "above_photo"
+// Endpoint para registrar uma propriedade com upload de imagens
 app.post(
   "/properties",
   upload.fields([{ name: "front_photo" }, { name: "above_photo" }]),
   async (req, res) => {
     try {
-      // Extrai os dados da propriedade do corpo da requisição
       const {
         zip_code,
         street,
-        house_number, // Corrigido de "number" para "house_number"
+        house_number,
         neighborhood,
         complement,
         city,
@@ -162,14 +178,21 @@ app.post(
         property_registration,
         tax_type,
         land_area,
-        built_area
+        built_area,
+        owner_name,
+        owner_cpf_cnpj,
+        possessor_name,
+        possessor_cpf_cnpj,
       } = req.body;
 
-      // Verifica se as imagens foram enviadas corretamente antes de acessar
-      const front_photo = req.files?.front_photo ? req.files.front_photo[0].path : null;
-      const above_photo = req.files?.above_photo ? req.files.above_photo[0].path : null;
+      const front_photo = req.files?.front_photo
+        ? req.files.front_photo[0].path
+        : null;
+      const above_photo = req.files?.above_photo
+        ? req.files.above_photo[0].path
+        : null;
 
-      // Insere os dados da propriedade no banco de dados
+      // Inserção da propriedade no banco de dados
       const [result] = await db.query(
         "INSERT INTO properties (zip_code, street, house_number, neighborhood, complement, city, state, property_registration, tax_type, land_area, built_area, front_photo, above_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
@@ -177,7 +200,7 @@ app.post(
           street,
           house_number,
           neighborhood,
-          complement || null, // Permite null se não enviado
+          complement || null,
           city,
           state,
           property_registration,
@@ -185,81 +208,144 @@ app.post(
           land_area,
           built_area,
           front_photo || null,
-          above_photo || null
-        // Se os dados do proprietário foram enviados, insere na tabela "owners"
-        if (owner_name && owner_cpf_cnpj) {
-          db.query(
-            "INSERT INTO owners (name, cpf_cnpj) VALUES (?, ?)",
-            [owner_name, owner_cpf_cnpj],
-            (err, result) => {
-              if (err) {
-                console.error("Erro ao inserir proprietário:", err);
-                return res.status(500).send("Erro ao inserir proprietário");
-              }
+          above_photo || null,
+        ]
+      );
 
-              // Recupera o ID do proprietário inserido
-              const owner_id = result.insertId;
+      const property_id = result.insertId; // Pegamos o ID da propriedade cadastrada
 
-              // Associa o proprietário à propriedade na tabela de relacionamento "property_owners"
-              db.query(
-                "INSERT INTO property_owners (property_id, owner_id) VALUES (?, ?)",
-                [property_id, owner_id],
-                (err) => {
-                  if (err) {
-                    console.error(
-                      "Erro ao associar proprietário à propriedade:",
-                      err
-                    );
-                    return res
-                      .status(500)
-                      .send("Erro ao associar proprietário à propriedade");
-                  }
-                }
-              );
-            }
-          );
-        }
+      // Inserção do proprietário, se fornecido
+      if (owner_name && owner_cpf_cnpj) {
+        const [ownerResult] = await db.query(
+          "INSERT INTO owners (name, cpf_cnpj) VALUES (?, ?)",
+          [owner_name, owner_cpf_cnpj]
+        );
+        const owner_id = ownerResult.insertId;
 
-        // Se os dados do possuidor foram enviados, insere na tabela "possessors"
-        if (possessor_name && possessor_cpf_cnpj) {
-          db.query(
-            "INSERT INTO possessors (name, cpf_cnpj) VALUES (?, ?)",
-            [possessor_name, possessor_cpf_cnpj],
-            (err, result) => {
-              if (err) {
-                console.error("Erro ao inserir possuidor:", err);
-                return res.status(500).send("Erro ao inserir possuidor");
-              }
-
-              // Recupera o ID do possuidor inserido
-              const possessor_id = result.insertId;
-
-              // Associa o possuidor à propriedade na tabela de relacionamento "property_possessors"
-              db.query(
-                "INSERT INTO property_possessors (property_id, possessor_id) VALUES (?, ?)",
-                [property_id, possessor_id],
-                (err) => {
-                  if (err) {
-                    console.error(
-                      "Erro ao associar possuidor à propriedade:",
-                      err
-                    );
-                    return res
-                      .status(500)
-                      .send("Erro ao associar possuidor à propriedade");
-                  }
-                }
-              );
-            }
-          );
-        }
-
-        // Retorna uma mensagem de sucesso após o cadastro da propriedade
-        res.status(201).send("Propriedade registrada com sucesso");
+        await db.query(
+          "INSERT INTO property_owners (property_id, owner_id) VALUES (?, ?)",
+          [property_id, owner_id]
+        );
       }
-    );
+
+      // Inserção do possuidor, se fornecido
+      if (possessor_name && possessor_cpf_cnpj) {
+        const [possessorResult] = await db.query(
+          "INSERT INTO possessors (name, cpf_cnpj) VALUES (?, ?)",
+          [possessor_name, possessor_cpf_cnpj]
+        );
+        const possessor_id = possessorResult.insertId;
+
+        await db.query(
+          "INSERT INTO property_possessors (property_id, possessor_id) VALUES (?, ?)",
+          [property_id, possessor_id]
+        );
+      }
+
+      res.status(201).send("Propriedade registrada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao registrar propriedade:", error);
+      res.status(500).send("Erro ao registrar propriedade");
+    }
   }
 );
+// Endpoint para atualizar uma propriedade existente
+app.put(
+  "/properties/:id",
+  upload.fields([{ name: "front_photo" }, { name: "above_photo" }]),
+  async (req, res) => {
+    const { id } = req.params;
+    console.log("Dados recebidos:", req.body); // 🔍 Verifica se os dados estão chegando
+
+    const {
+      zip_code,
+      street,
+      house_number,
+      neighborhood,
+      complement,
+      city,
+      state,
+      property_registration,
+      tax_type,
+      land_area,
+      built_area,
+    } = req.body;
+
+    const front_photo = req.files?.front_photo
+      ? req.files.front_photo[0].path
+      : null;
+    const above_photo = req.files?.above_photo
+      ? req.files.above_photo[0].path
+      : null;
+
+    try {
+      const [result] = await db.query(
+        "UPDATE properties SET zip_code=?, street=?, house_number=?, neighborhood=?, complement=?, city=?, state=?, property_registration=?, tax_type=?, land_area=?, built_area=?, front_photo=?, above_photo=? WHERE id=?",
+        [
+          zip_code || null,
+          street || null,
+          house_number || null,
+          neighborhood || null,
+          complement || null,
+          city || null,
+          state || null,
+          property_registration || null,
+          tax_type || null,
+          land_area || null,
+          built_area || null,
+          front_photo || null,
+          above_photo || null,
+          id,
+        ]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Propriedade não encontrada" });
+      }
+
+      res.json({ message: "Propriedade atualizada com sucesso!" });
+    } catch (error) {
+      console.error(
+        "Erro ao atualizar propriedade:",
+        error.sqlMessage || error
+      );
+      res.status(500).json({
+        error: error.sqlMessage || "Erro desconhecido ao atualizar propriedade",
+      });
+    }
+  }
+);
+
+// Endpoint para deletar uma propriedade existente
+app.delete("/properties/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Verifica se a propriedade existe antes de deletar
+    const [existingProperty] = await db.query(
+      "SELECT * FROM properties WHERE id = ?",
+      [id]
+    );
+
+    if (existingProperty.length === 0) {
+      return res.status(404).json({ error: "Propriedade não encontrada" });
+    }
+
+    // Deleta a propriedade
+    const [result] = await db.query("DELETE FROM properties WHERE id = ?", [
+      id,
+    ]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Erro ao deletar a propriedade" });
+    }
+
+    res.json({ message: "Propriedade deletada com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao deletar propriedade:", error);
+    res.status(500).send("Erro ao deletar propriedade");
+  }
+});
 
 // Inicia o servidor na porta definida e exibe uma mensagem no console
 app.listen(port, () => {

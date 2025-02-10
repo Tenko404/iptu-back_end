@@ -25,7 +25,7 @@ CREATE TABLE user_login (
 
 CREATE TABLE properties (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    zip_code CHAR(8) NOT NULL,
+    zip_code CHAR(9) NOT NULL,
     street VARCHAR(100) NOT NULL,
     house_number VARCHAR(10) NOT NULL,
     neighborhood VARCHAR(50) NOT NULL,
