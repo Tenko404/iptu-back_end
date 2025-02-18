@@ -1,51 +1,39 @@
-// src/models/person.js
-const db = require("../config/db");
+// ./src/Models/Person.js
+import pool from "../Config/db.js";
 
-const Person = {
-  //Find for owners.
-  findOwners: async () => {
-    return await db.query('SELECT * FROM people where type = "owner"');
-  },
-  //Find for possessors.
-  findPossessors: async () => {
-    return await db.query('SELECT * FROM people where type = "possessor"');
-  },
-
-  //General
-  findAll: async () => {
-    return await db.query("SELECT * FROM people");
-  },
-
-  findById: async (id) => {
-    const [rows] = await db.query("SELECT * FROM people WHERE id = ?", [id]);
-    return rows[0]; // Return the first row (or undefined if not found)
-  },
-
-  findByDocument: async (document_type, document) => {
-    //New method!
-    const [rows] = await db.query(
-      "SELECT * FROM people where document_type = ? AND document = ?",
-      [document_type, document]
+async function createPerson(name, documentType, document) {
+  try {
+    const [result] = await pool.query(
+      "INSERT INTO people (name, document_type, document) VALUES (?, ?, ?)",
+      [name, documentType, document]
+    );
+    return { id: result.insertId, name, document_type: documentType, document }; // Return the ID of the new person
+  } catch (error) {
+    console.error("Error in createPerson:", error);
+    throw error;
+  }
+}
+async function getPersonByDocument(documentType, document) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT * FROM people WHERE document_type = ? AND document = ?",
+      [documentType, document]
     );
     return rows[0];
-  },
+  } catch (error) {
+    console.error("Error in getPersonByDocument: ", error);
+    throw error;
+  }
+}
 
-  create: async (personData) => {
-    const [result] = await db.query("INSERT INTO people SET ?", personData);
-    return result.insertId;
-  },
+async function getPersonById(id) {
+  try {
+    const [rows] = await pool.query("SELECT * FROM people WHERE id = ?", [id]);
+    return rows[0];
+  } catch (error) {
+    console.error("Error in getPersonById: ", error);
+    throw error;
+  }
+}
 
-  update: async (id, personData) => {
-    const [result] = await db.query("UPDATE people SET ? WHERE id = ?", [
-      personData,
-      id,
-    ]);
-    return result.affectedRows;
-  },
-
-  delete: async (id) => {
-    const [result] = await db.query("DELETE FROM people WHERE id = ?", [id]);
-    return result.affectedRows;
-  },
-};
-module.exports = Person;
+export { createPerson, getPersonByDocument, getPersonById };
