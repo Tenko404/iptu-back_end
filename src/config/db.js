@@ -1,46 +1,32 @@
-const mysql = require("mysql2/promise");
-const config = require("../../config");
-require("dotenv").config({ path: config.envPath });
+// ./src/Config/db.js
+import mysql from "mysql2/promise"; // Import the promise-based version
+import dotenv from "dotenv";
 
-// Validate environment variables
-if (
-  !process.env.DB_HOST ||
-  !process.env.DB_USER ||
-  !process.env.DB_PASSWORD ||
-  !process.env.DB_NAME
-) {
-  console.error("ERROR: Missing required database environment variables.");
-  process.exit(1);
-}
+dotenv.config(); // Load environment variables from .env
 
-const db = mysql.createPool({
+// Create a connection pool (recommended for better performance)
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  connectionLimit: 10, // Adjust as needed
+  queueLimit: 0, // 0 means no limit
 });
 
-db.getConnection()
-  .then(() => console.log("✅ Database connected successfully!"))
-  .catch((err) => console.error("❌ Database connection error:", err));
-
-// Async query function
-async function query(sql, params) {
-  let connection;
+// Test the database connection (optional, but good practice)
+async function testConnection() {
   try {
-    connection = await db.getConnection();
-    const [rows] = await connection.query(sql, params);
-    return rows;
+    const connection = await pool.getConnection();
+    console.log("Database connection successful!");
+    connection.release(); // Release the connection back to the pool
   } catch (error) {
-    console.error("Database query error:", error);
-    throw error; // Re-throw the error for handling by caller
-  } finally {
-    if (connection) {
-      connection.release(); // *Always* release the connection
-    }
+    console.error("Database connection failed:", error);
+    process.exit(1); // Exit the process if the database connection fails
   }
 }
-module.exports = { query };
+
+testConnection();
+
+export default pool; // Export the connection pool
