@@ -1,54 +1,45 @@
-// src/routes/index.js
-const express = require("express");
+// ./src/Routes/routes.js
+import express from "express";
+import * as UserController from "../Controllers/UserController.js";
+import * as PeopleController from "../Controllers/PeopleController.js";
+import * as PropertyController from "../Controllers/PropertyController.js";
+import { loginRequest } from "../Request/UserRequest.js";
+import { createPersonRequest } from "../Request/PersonRequest.js";
+import {
+  createPropertyRequest,
+  updatePropertyRequest,
+} from "../Request/PropertyRequest.js";
+import { upload } from "../server.js"; //import the configured multer
+
 const router = express.Router();
-const propertiesController = require("../controllers/propertiesController");
-const personsController = require("../controllers/personsController"); // Use new controller
-const usersController = require("../controllers/usersController");
-const { authenticateToken } = require("../middleware/auth");
 
-// --- PROPERTIES ROUTES ---
-router.get("/properties", propertiesController.getProperties);
-router.get(
-  "/properties/:id",
-  authenticateToken,
-  propertiesController.getPropertyById
-); // Protected
+// --- User Routes ---
+router.post("/api/users/login", loginRequest, UserController.login);
+
+// --- People Routes ---
+router.post("/api/people", createPersonRequest, PeopleController.createPerson);
+
+// --- Property Routes ---
 router.post(
-  "/properties",
-  propertiesController.upload.fields([
-    { name: "front_photo" },
-    { name: "above_photo" },
+  "/api/properties",
+  upload.fields([
+    { name: "front_photo", maxCount: 1 },
+    { name: "above_photo", maxCount: 1 },
   ]),
-  propertiesController.createProperty
+  createPropertyRequest,
+  PropertyController.createProperty
 );
+router.get("/api/properties/:id", PropertyController.getPropertyById);
+router.get("/api/properties", PropertyController.getAllProperties);
 router.put(
-  "/properties/:id",
-  propertiesController.upload.fields([
-    { name: "front_photo" },
-    { name: "above_photo" },
+  "/api/properties/:id",
+  upload.fields([
+    { name: "front_photo", maxCount: 1 },
+    { name: "above_photo", maxCount: 1 },
   ]),
-  propertiesController.updateProperty
+  updatePropertyRequest,
+  PropertyController.updateProperty
 );
-router.delete("/properties/:id", propertiesController.deleteProperty);
+router.delete("/api/properties/:id", PropertyController.deleteProperty);
 
-// --- PERSONS ROUTES (Owners and Possessors) ---
-router.get("/persons", personsController.getAllPersons); // Get all people
-router.get("/persons/:id", personsController.getPersonById); // Get a person by ID
-router.post("/persons", personsController.createPerson); // Create a person
-router.put("/persons/:id", personsController.updatePerson); // Update a person
-router.delete("/persons/:id", personsController.deletePerson); // Delete a person
-router.get("/owners", personsController.getAllOwners);
-router.get("/possessors", personsController.getAllPossessors);
-
-// --- USERS ROUTES ---
-router.post("/register", usersController.registerUser);
-router.post("/login", usersController.loginUser);
-
-// --- Upload Routes ---
-
-router.post(
-  "/upload",
-  propertiesController.upload.array("photos", 2),
-  propertiesController.uploadPhotos
-);
-module.exports = router;
+export default router;
