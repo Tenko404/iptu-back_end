@@ -1,7 +1,6 @@
-// ./src/Request/PropertyRequest.js
 import { body, param } from "express-validator";
-import { isValidCPF, isValidCNPJ } from "../Services/utils.js";
-import * as PeopleService from "../Services/PeopleService.js";
+import { isValidCPF, isValidCNPJ } from "../services/utils.js";
+import * as PeopleService from "../services/peopleService.js";
 
 const createPropertyRequest = [
   body("zip_code")

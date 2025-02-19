@@ -1,5 +1,4 @@
-// ./src/Models/User.js
-import pool from "../Config/db.js";
+import pool from "../config/db.js";
 
 async function getUserByEmployeeId(employeeId) {
   try {

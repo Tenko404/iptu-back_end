@@ -1,6 +1,5 @@
-// ./src/Services/PropertyService.js
-import * as PropertyModel from "../Models/Property.js";
-import * as PersonModel from "../Models/Person.js";
+import * as PropertyModel from "../models/property.js";
+import * as PersonModel from "../models/person.js";
 import { getAddressFromCEP } from "./utils.js"; // Import getAddressFromCEP
 
 async function createProperty(propertyData) {
