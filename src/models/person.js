@@ -1,5 +1,4 @@
-// ./src/Models/Person.js
-import pool from "../Config/db.js";
+import pool from "../config/db.js";
 
 async function createPerson(name, documentType, document) {
   try {
