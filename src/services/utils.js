@@ -1,4 +1,3 @@
-// ./src/Services/utils.js
 import axios from "axios";
 
 function isValidCPF(cpf) {

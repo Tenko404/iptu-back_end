@@ -1,5 +1,4 @@
-// ./src/Services/UserService.js
-import * as UserModel from "../Models/User.js";
+import * as UserModel from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";

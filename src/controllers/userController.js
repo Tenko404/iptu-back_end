@@ -1,5 +1,4 @@
-// ./src/Controllers/UserController.js
-import * as UserService from "../Services/UserService.js";
+import * as UserService from "../services/userService.js";
 import { validationResult } from "express-validator";
 
 export const login = async (req, res) => {
@@ -18,10 +17,10 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error("Error in login controller:", error);
 
-    if (error.message === "Invalid credentials") {
-      res.status(401).json({ message: "Invalid credentials" });
-    } else if (error.message === "User not found") {
-      res.status(404).json({ message: "User not found" });
+    if (error.message === "Credenciais inválidas") {
+      res.status(401).json({ message: "Credenciais inválidas" });
+    } else if (error.message === "Usuário não encontrado") {
+      res.status(404).json({ message: "Usuário não encontrado" });
     } else {
       res.status(500).json({ message: "Internal server error" });
     }

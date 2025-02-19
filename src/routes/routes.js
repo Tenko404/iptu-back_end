@@ -1,14 +1,13 @@
-// ./src/Routes/routes.js
 import express from "express";
-import * as UserController from "../Controllers/UserController.js";
-import * as PeopleController from "../Controllers/PeopleController.js";
-import * as PropertyController from "../Controllers/PropertyController.js";
-import { loginRequest } from "../Request/UserRequest.js";
-import { createPersonRequest } from "../Request/PersonRequest.js";
+import * as UserController from "../controllers/userController.js";
+import * as PeopleController from "../controllers/peopleController.js";
+import * as PropertyController from "../controllers/propertyController.js";
+import { loginRequest } from "../request/userRequest.js";
+import { createPersonRequest } from "../request/personRequest.js";
 import {
   createPropertyRequest,
   updatePropertyRequest,
-} from "../Request/PropertyRequest.js";
+} from "../request/propertyRequest.js";
 import { upload } from "../server.js"; //import the configured multer
 
 const router = express.Router();
