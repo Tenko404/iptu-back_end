@@ -1,7 +1,7 @@
 // ./src/server.js
 import express from "express";
 import cors from "cors";
-import routes from "./Routes/routes.js";
+import routes from "./routes/routes.js";
 import dotenv from "dotenv";
 import multer from "multer"; // Import multer
 import path from "path";
@@ -30,7 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 // Define storage for uploaded files
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "uploads/")); // Store files in an 'uploads' directory
+    cb(null, path.join(__dirname, "public", "uploads")); // Store files in an 'uploads' directory
   },
   filename: function (req, file, cb) {
     // Create a unique filename (e.g., using a timestamp and the original file extension)
@@ -62,8 +62,7 @@ const upload = multer({
 app.use(routes);
 
 // --- Serve Static Files (Uploaded Images) ---
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 // --- Error Handling Middleware (Centralized) ---
 
 app.use((err, req, res, next) => {

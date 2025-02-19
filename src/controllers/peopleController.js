@@ -1,5 +1,4 @@
-// ./src/Controllers/PeopleController.js
-import * as PeopleService from "../Services/PeopleService.js";
+import * as PeopleService from "../services/peopleService.js";
 import { validationResult } from "express-validator";
 
 export const createPerson = async (req, res) => {
@@ -14,14 +13,14 @@ export const createPerson = async (req, res) => {
 
     res
       .status(201)
-      .json({ message: "Person created successfully", id: newPerson.id });
+      .json({ message: "Pessoa criada com sucesso", id: newPerson.id });
   } catch (error) {
-    console.error("Error in createPerson controller:", error);
+    console.error("Erro em createPerson controller:", error);
     if (error.code === "ER_DUP_ENTRY") {
       // Assuming you have a unique constraint on document (CPF/CNPJ)
       res
         .status(409)
-        .json({ message: "A person with this document already exists." });
+        .json({ message: "Uma pessoa com este documento ja existe!." });
     } else {
       res.status(500).json({ message: "Internal server error" });
     }

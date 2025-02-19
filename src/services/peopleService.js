@@ -1,5 +1,4 @@
-// ./src/Services/PeopleService.js
-import * as PersonModel from "../Models/Person.js";
+import * as PersonModel from "../models/person.js";
 
 async function createPerson(personData) {
   const { name, email, phone_number, document_type, document } = personData;
