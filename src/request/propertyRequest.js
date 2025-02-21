@@ -30,12 +30,16 @@ const createPropertyRequest = [
     .isLength({ max: 50 })
     .withMessage("City must be less than 50 characters")
     .notEmpty()
-    .withMessage("City is required"),
+    .withMessage("City is required")
+    .equals("Vassouras")
+    .withMessage("City must be Vassouras"),
   body("state")
     .isLength({ min: 2, max: 2 })
     .withMessage("State must be a 2-letter code")
     .notEmpty()
-    .withMessage("State is required"),
+    .withMessage("State is required")
+    .equals("RJ")
+    .withMessage("State must be RJ"),
   body("property_registration")
     .isInt()
     .withMessage("Property registration must be a number")
@@ -44,7 +48,7 @@ const createPropertyRequest = [
     .notEmpty()
     .withMessage("Property registration is required"),
   body("tax_type")
-    .isIn(["residential", "commercial", "both"])
+    .isIn(["residential", "commercial", "both", "territorial"])
     .withMessage("Invalid tax type")
     .notEmpty()
     .withMessage("Tax type is required"),
@@ -186,10 +190,14 @@ const updatePropertyRequest = [
   body("city")
     .isLength({ max: 50 })
     .withMessage("City must be less than 50 characters")
+    .equals("Vassouras")
+    .withMessage("City must be Vassouras")
     .optional(),
   body("state")
     .isLength({ min: 2, max: 2 })
     .withMessage("State must be a 2-letter code")
+    .equals("RJ")
+    .withMessage("State must be RJ")
     .optional(),
   body("property_registration")
     .isInt()
@@ -198,7 +206,7 @@ const updatePropertyRequest = [
     .withMessage("Property registration must have 6 digits")
     .optional(),
   body("tax_type")
-    .isIn(["residential", "commercial", "both"])
+    .isIn(["residential", "commercial", "both", "territorial"])
     .withMessage("Invalid tax type")
     .optional(),
   body("land_area")

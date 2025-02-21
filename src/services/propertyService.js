@@ -10,13 +10,13 @@ async function createProperty(propertyData) {
   const addressFromCep = await getAddressFromCEP(zip_code);
 
   if (!addressFromCep) {
-    throw new Error("Invalid CEP"); // Or handle the error as appropriate for your UI
+    throw new Error("CEP inválido."); // Or handle the error as appropriate for your UI
   }
   // Check if owners exist, before creating the property
   for (const ownerId of owner_ids) {
     const ownerExists = await PersonModel.getPersonById(ownerId);
     if (!ownerExists) {
-      throw new Error("One or more owners not found");
+      throw new Error("Um ou mais proprietários não encontrados.");
     }
   }
   //if possessor exists, checks it
@@ -25,26 +25,28 @@ async function createProperty(propertyData) {
       possessor.person_id
     );
     if (!possessorExists) {
-      throw new Error("Possessor not found");
+      throw new Error("Possuidor não encontrado.");
     }
   }
   //if executor exists, checks it
   if (executor) {
     const executorExists = await PersonModel.getPersonById(executor.person_id);
     if (!executorExists) {
-      throw new Error("Executor not found");
+      throw new Error("Executor não encontrado.");
     }
   }
-
+  // --- 1.5. Fixed City and State ---
+  const fixedCity = "Vassouras";
+  const fixedState = "RJ";
   // --- 2. Create the Property ---
   const newProperty = await PropertyModel.createProperty({
     ...propertyData,
     street: addressFromCep.logradouro,
     neighborhood: addressFromCep.bairro,
-    city: addressFromCep.localidade,
-    state: addressFromCep.uf,
-    front_photo: front_photo, // ADDED THIS
-    above_photo: above_photo, // ADDED THIS
+    city: fixedCity,
+    state: fixedState,
+    front_photo: front_photo,
+    above_photo: above_photo,
   });
 
   // --- 3. Link Owners to Property ---
@@ -119,7 +121,7 @@ async function updateProperty(propertyId, propertyData) {
   // Check if the property exists
   const propertyExists = await PropertyModel.getPropertyById(propertyId);
   if (!propertyExists) {
-    throw new Error("Property not found");
+    throw new Error("Propriedade não encontrada.");
   }
 
   // --- 1. CEP Auto-fill (using utils.js) ---
@@ -129,7 +131,7 @@ async function updateProperty(propertyId, propertyData) {
     addressFromCep = await getAddressFromCEP(zip_code);
 
     if (!addressFromCep) {
-      throw new Error("Invalid CEP"); // Or handle the error as appropriate for your UI
+      throw new Error("CEP inválido."); // Or handle the error as appropriate for your UI
     }
   }
   // Check if owners exist, before updating the property
@@ -137,7 +139,7 @@ async function updateProperty(propertyId, propertyData) {
     for (const ownerId of owner_ids) {
       const ownerExists = await PersonModel.getPersonById(ownerId);
       if (!ownerExists) {
-        throw new Error("One or more owners not found");
+        throw new Error("Um ou mais proprietários não encontrados.");
       }
     }
   }
@@ -148,32 +150,36 @@ async function updateProperty(propertyId, propertyData) {
       possessor.person_id
     );
     if (!possessorExists) {
-      throw new Error("Possessor not found");
+      throw new Error("Possuidor não encontrado.");
     }
   }
   //if executor exists, checks it
   if (executor) {
     const executorExists = await PersonModel.getPersonById(executor.person_id);
     if (!executorExists) {
-      throw new Error("Executor not found");
+      throw new Error("Executor não encontrado.");
     }
   }
   // --- 2. Update Property ---
+  const fixedCity = "Vassouras";
+  const fixedState = "RJ";
   //If there is data from cep, uses it
   const updateData = addressFromCep
     ? {
         ...propertyData,
         street: addressFromCep.logradouro,
         neighborhood: addressFromCep.bairro,
-        city: addressFromCep.localidade,
-        state: addressFromCep.uf,
-        front_photo: front_photo, // ADDED THIS
-        above_photo: above_photo, // ADDED THIS
+        city: fixedCity,
+        state: fixedState,
+        front_photo: front_photo,
+        above_photo: above_photo,
       }
     : {
         ...propertyData,
-        front_photo: front_photo, // ADDED THIS
-        above_photo: above_photo, // ADDED THIS
+        city: fixedCity,
+        state: fixedState,
+        front_photo: front_photo,
+        above_photo: above_photo,
       };
   //removes undefined values
   const filteredUpdateData = Object.fromEntries(
