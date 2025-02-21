@@ -27,16 +27,18 @@ export const createProperty = async (req, res) => {
       .status(201)
       .json({ message: "Propriedade criada com sucesso!", id: newProperty.id });
   } catch (error) {
-    console.error("Erro em createProperty controller:", error);
+    console.error("Error in createProperty controller:", error);
     if (error.code === "ER_DUP_ENTRY") {
       //Handle duplicate property registration number
       res.status(409).json({
-        message: "Uma propriedade com esse registro já existe.",
+        message: "Já existe uma propriedade com este número de inscrição.",
       });
     } else if (error.message === "One or more owners not found") {
-      res.status(400).json({ message: error.message });
+      res
+        .status(400)
+        .json({ message: "Um ou mais proprietários não encontrados." });
     } else {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Erro interno do servidor." });
     }
   }
 };
@@ -52,8 +54,8 @@ export const getPropertyById = async (req, res) => {
 
     res.status(200).json(property);
   } catch (error) {
-    console.error("Erro em getPropertyById controller:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error in getPropertyById controller:", error);
+    res.status(500).json({ message: "Erro interno do servidor." });
   }
 };
 
@@ -64,7 +66,7 @@ export const getAllProperties = async (req, res) => {
     res.status(200).json(properties);
   } catch (error) {
     console.error("Erro em getAllProperties controller: ", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Erro interno do servidor." });
   }
 };
 
@@ -97,16 +99,16 @@ export const updateProperty = async (req, res) => {
 
     res.status(200).json({ message: "Propriedade atualizada com sucesso!" });
   } catch (error) {
-    console.error("Erro em updateProperty controller:", error);
+    console.error("Error in updateProperty controller:", error);
     if (error.code === "ER_DUP_ENTRY") {
       // Handle duplicate property registration number
       res.status(409).json({
-        message: "Uma propriedade com esse registro já existe.",
+        message: "Já existe uma propriedade com este número de inscrição.",
       });
     } else if (error.message === "Property not found") {
-      res.status(404).json({ message: "Property not found" });
+      res.status(404).json({ message: "Propriedade não encontrada." });
     } else {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Erro interno do servidor." });
     }
   }
 };
@@ -116,13 +118,13 @@ export const deleteProperty = async (req, res) => {
     const propertyId = req.params.id;
     await PropertyService.deleteProperty(propertyId);
 
-    res.status(200).json({ message: "Propriedade deletada com sucesso!" });
+    res.status(200).json({ message: "Propriedade excluída com sucesso!" });
   } catch (error) {
-    console.error("Erro em deleteProperty controller: ", error);
-    if (error.message === "Propriedade não encontrada") {
-      res.status(404).json({ message: "Propriedade não encontrada" });
+    console.error("Error in deleteProperty controller: ", error);
+    if (error.message === "Property not found") {
+      res.status(404).json({ message: "Propriedade não encontrada." });
     } else {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Erro interno do servidor." });
     }
   }
 };

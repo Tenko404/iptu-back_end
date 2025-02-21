@@ -17,12 +17,12 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error("Error in login controller:", error);
 
-    if (error.message === "Credenciais inválidas") {
+    if (error.message === "Invalid credentials") {
       res.status(401).json({ message: "Credenciais inválidas" });
-    } else if (error.message === "Usuário não encontrado") {
+    } else if (error.message === "User not found") {
       res.status(404).json({ message: "Usuário não encontrado" });
     } else {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Erro interno do servidor." });
     }
   }
 };
