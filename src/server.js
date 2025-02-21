@@ -73,7 +73,7 @@ app.use((err, req, res, next) => {
     res.status(400).json({ message: err.message });
   } else {
     // Handle other errors (including errors thrown from controllers/services)
-    res.status(500).json({ message: "Something went wrong!" });
+    res.status(500).json({ message: "Ocorreu um erro no servidor." });
   }
 });
 

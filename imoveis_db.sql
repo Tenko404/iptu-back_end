@@ -35,7 +35,7 @@ CREATE TABLE properties (
     city VARCHAR(50) NOT NULL,
     state CHAR(2) NOT NULL,
     property_registration VARCHAR(50) NOT NULL,
-    tax_type ENUM('commercial', 'residential', 'both') NOT NULL,
+    tax_type ENUM('commercial', 'residential', 'both', 'territorial') NOT NULL,
     land_area DECIMAL(10, 2) NOT NULL,
     built_area DECIMAL(10, 2) NOT NULL,
     front_photo VARCHAR(255) NULL DEFAULT NULL,
