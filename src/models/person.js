@@ -35,4 +35,46 @@ async function getPersonById(id) {
   }
 }
 
-export { createPerson, getPersonByDocument, getPersonById };
+async function getAllPeople() {
+  try {
+    const [rows] = await pool.query("SELECT * FROM people");
+    return rows;
+  } catch (error) {
+    console.error("Error in getAllPeople: ", error);
+    throw error;
+  }
+}
+
+async function updatePerson(id, personData) {
+  try {
+    const { name, email, phone_number, document_type, document } = personData;
+    const [result] = await pool.query(
+      `UPDATE people
+      SET name = ?, email = ?, phone_number = ?, document_type = ?, document = ?
+      WHERE id = ?`,
+      [name, email, phone_number, document_type, document, id]
+    );
+    return result;
+  } catch (error) {
+    console.error("Error in updatePerson:", error);
+    throw error;
+  }
+}
+async function deletePerson(id) {
+  try {
+    const [result] = await pool.query("DELETE FROM people WHERE id = ?", [id]);
+    return result;
+  } catch (error) {
+    console.error("Error in deletePerson: ", error);
+    throw error;
+  }
+}
+
+export {
+  createPerson,
+  getPersonByDocument,
+  getPersonById,
+  updatePerson,
+  deletePerson,
+  getAllPeople,
+};
