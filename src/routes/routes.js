@@ -1,4 +1,3 @@
-// ./src/Routes/routes.js
 import express from "express";
 import * as UserController from "../controllers/userController.js";
 import * as PeopleController from "../controllers/peopleController.js";
@@ -12,8 +11,8 @@ import {
   createPropertyRequest,
   updatePropertyRequest,
 } from "../request/propertyRequest.js";
-import { upload } from "../server.js"; //import the configured multer
-import { verifyToken, isAdmin } from "../middleware/auth.js"; // Import the middleware
+import upload from "../middleware/multerConfig.js"; // IMPORT FROM THE NEW FILE
+import { verifyToken, isAdmin, isStaff, isDev } from "../middleware/auth.js"; // Import the middleware
 
 const router = express.Router();
 
@@ -32,10 +31,16 @@ router.get("/api/people", verifyToken, PeopleController.getAllPeople); // Requir
 router.put(
   "/api/people/:id",
   verifyToken,
+  isDev,
   updatePersonRequest,
   PeopleController.updatePerson
-); // Requires authentication
-router.delete("/api/people/:id", verifyToken, PeopleController.deletePerson); // Requires authentication
+); // Requires authentication AND dev role
+router.delete(
+  "/api/people/:id",
+  verifyToken,
+  isDev,
+  PeopleController.deletePerson
+); // Requires authentication AND dev role
 
 // --- Property Routes ---
 router.post(
@@ -67,7 +72,8 @@ router.put(
 router.delete(
   "/api/properties/:id",
   verifyToken,
+  isDev,
   PropertyController.deleteProperty
-); // Requires authentication
+); // Requires authentication AND dev role
 
 export default router;

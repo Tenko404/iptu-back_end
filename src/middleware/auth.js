@@ -42,4 +42,26 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-export { verifyToken, isAdmin };
+// New middleware for 'staff' role
+const isStaff = (req, res, next) => {
+  if (req.user && req.user.role === "staff") {
+    next();
+  } else {
+    res
+      .status(403)
+      .json({ message: "Acesso não autorizado. Requer permissão de staff." });
+  }
+};
+
+// New middleware for 'dev' role
+const isDev = (req, res, next) => {
+  if (req.user && req.user.role === "dev") {
+    next();
+  } else {
+    res
+      .status(403)
+      .json({ message: "Acesso não autorizado. Requer permissão de dev." });
+  }
+};
+
+export { verifyToken, isAdmin, isStaff, isDev };
