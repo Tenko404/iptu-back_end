@@ -35,16 +35,9 @@ async function createProperty(propertyData) {
       throw new Error("Executor não encontrado.");
     }
   }
-  // --- 1.5. Fixed City and State ---
-  const fixedCity = "Vassouras";
-  const fixedState = "RJ";
   // --- 2. Create the Property ---
   const newProperty = await PropertyModel.createProperty({
     ...propertyData,
-    street: addressFromCep.logradouro,
-    neighborhood: addressFromCep.bairro,
-    city: fixedCity,
-    state: fixedState,
     front_photo: front_photo,
     above_photo: above_photo,
   });
@@ -124,16 +117,6 @@ async function updateProperty(propertyId, propertyData) {
     throw new Error("Propriedade não encontrada.");
   }
 
-  // --- 1. CEP Auto-fill (using utils.js) ---
-  let addressFromCep = null;
-  //if the zip code is sent, gets the information
-  if (zip_code) {
-    addressFromCep = await getAddressFromCEP(zip_code);
-
-    if (!addressFromCep) {
-      throw new Error("CEP inválido."); // Or handle the error as appropriate for your UI
-    }
-  }
   // Check if owners exist, before updating the property
   if (owner_ids) {
     for (const ownerId of owner_ids) {
@@ -160,27 +143,12 @@ async function updateProperty(propertyId, propertyData) {
       throw new Error("Executor não encontrado.");
     }
   }
-  // --- 2. Update Property ---
-  const fixedCity = "Vassouras";
-  const fixedState = "RJ";
   //If there is data from cep, uses it
-  const updateData = addressFromCep
-    ? {
-        ...propertyData,
-        street: addressFromCep.logradouro,
-        neighborhood: addressFromCep.bairro,
-        city: fixedCity,
-        state: fixedState,
-        front_photo: front_photo,
-        above_photo: above_photo,
-      }
-    : {
-        ...propertyData,
-        city: fixedCity,
-        state: fixedState,
-        front_photo: front_photo,
-        above_photo: above_photo,
-      };
+  const updateData = {
+    ...propertyData,
+    front_photo: front_photo,
+    above_photo: above_photo,
+  };
   //removes undefined values
   const filteredUpdateData = Object.fromEntries(
     Object.entries(updateData).filter(([key, value]) => value !== undefined)

@@ -1,9 +1,7 @@
-// ./src/server.js
 import express from "express";
 import cors from "cors";
 import routes from "./routes/routes.js";
 import dotenv from "dotenv";
-import multer from "multer"; // Import multer
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -24,39 +22,6 @@ app.use(express.json());
 
 // Parse URL-encoded request bodies (for form data)
 app.use(express.urlencoded({ extended: true }));
-
-// --- Multer Configuration (for file uploads) ---
-
-// Define storage for uploaded files
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "public", "uploads")); // Store files in an 'uploads' directory
-  },
-  filename: function (req, file, cb) {
-    // Create a unique filename (e.g., using a timestamp and the original file extension)
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
-  },
-});
-
-// Create the multer instance
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 1024 * 1024 * 5, // Limit file size to 5MB (adjust as needed)
-  },
-  fileFilter: function (req, file, cb) {
-    //checks the file extension
-    const allowedExtensions = [".jpg", ".jpeg", ".png"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowedExtensions.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPG, JPEG, and PNG files are allowed"));
-    }
-  },
-});
 
 // --- Routes ---
 app.use(routes);
@@ -82,5 +47,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-
-export { upload }; //export the configured multer
