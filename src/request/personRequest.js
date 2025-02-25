@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // Assuming you have utility functions for CPF/CNPJ
 
 const createPersonRequest = [
