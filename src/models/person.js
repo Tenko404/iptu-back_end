@@ -1,12 +1,20 @@
 import pool from "../config/db.js";
 
-async function createPerson(name, documentType, document) {
+async function createPerson(name, documentType, document, email, phoneNumber) {
+  // Add email and phone
   try {
     const [result] = await pool.query(
-      "INSERT INTO people (name, document_type, document) VALUES (?, ?, ?)",
-      [name, documentType, document]
+      "INSERT INTO people (name, document_type, document, email, phone_number) VALUES (?, ?, ?, ?, ?)", // Add to query
+      [name, documentType, document, email, phoneNumber] // Add to parameters
     );
-    return { id: result.insertId, name, document_type: documentType, document }; // Return the ID of the new person
+    return {
+      id: result.insertId,
+      name,
+      document_type: documentType,
+      document,
+      email,
+      phone_number: phoneNumber,
+    }; // Return new fields
   } catch (error) {
     console.error("Error in createPerson:", error);
     throw error;
