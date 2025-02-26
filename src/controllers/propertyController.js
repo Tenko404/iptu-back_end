@@ -8,7 +8,6 @@ export const createProperty = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Access uploaded file paths (if files were uploaded)
     const frontPhotoPath = req.files["front_photo"]
       ? `/uploads/${req.files["front_photo"][0].filename}`
       : null;
@@ -18,28 +17,43 @@ export const createProperty = async (req, res) => {
 
     const propertyData = {
       ...req.body,
-      front_photo: frontPhotoPath, // Add to propertyData
-      above_photo: abovePhotoPath, // Add to propertyData
+      front_photo: frontPhotoPath,
+      above_photo: abovePhotoPath,
     };
 
     const newProperty = await PropertyService.createProperty(propertyData);
     res
       .status(201)
-      .json({ message: "Propriedade criada com sucesso!", id: newProperty.id });
+      .json({
+        message: "Propriedade criada com sucesso!",
+        property: newProperty,
+      }); // Return the created property object
   } catch (error) {
     console.error("Error in createProperty controller:", error);
-    if (error.code === "ER_DUP_ENTRY") {
-      //Handle duplicate property registration number
-      res.status(409).json({
-        message: "Já existe uma propriedade com este número de inscrição.",
-      });
-    } else if (error.message === "One or more owners not found") {
-      res
-        .status(400)
-        .json({ message: "Um ou mais proprietários não encontrados." });
-    } else {
-      res.status(500).json({ message: "Erro interno do servidor." });
+    let statusCode = 500;
+    let message = "Erro interno do servidor.";
+
+    // More specific error handling.
+    if (error.message.startsWith("Invalid owner ID")) {
+      statusCode = 400;
+      message = error.message;
+    } else if (error.message === "Invalid possessor ID") {
+      statusCode = 400;
+      message = error.message;
+    } else if (error.message === "Invalid executor ID") {
+      statusCode = 400;
+      message = error.message;
+    } else if (
+      error.message === "Já existe uma pessoa cadastrada com este documento."
+    ) {
+      //from PeopleService
+      statusCode = 409; //Conflict
+      message = error.message;
+    } else if (error.code === "ER_DUP_ENTRY") {
+      statusCode = 409;
+      message = "Já existe uma propriedade com este número de inscrição.";
     }
+    res.status(statusCode).json({ message });
   }
 };
 
@@ -59,10 +73,9 @@ export const getPropertyById = async (req, res) => {
   }
 };
 
-//get all properties
 export const getAllProperties = async (req, res) => {
   try {
-    const properties = await PropertyService.getAllProperties(req.query);
+    const properties = await PropertyService.getAllProperties(req.query); // Keep req.query for potential future use (filtering, etc.)
     res.status(200).json(properties);
   } catch (error) {
     console.error("Erro em getAllProperties controller: ", error);
@@ -78,7 +91,6 @@ export const updateProperty = async (req, res) => {
     }
     const propertyId = req.params.id;
 
-    // Access uploaded file paths (if files were uploaded)
     const frontPhotoPath = req.files["front_photo"]
       ? `/uploads/${req.files["front_photo"][0].filename}`
       : null;
@@ -88,28 +100,51 @@ export const updateProperty = async (req, res) => {
 
     const propertyData = {
       ...req.body,
-      front_photo: frontPhotoPath, // Add to propertyData
-      above_photo: abovePhotoPath, // Add to propertyData
+      front_photo: frontPhotoPath,
+      above_photo: abovePhotoPath,
     };
 
     const updatedProperty = await PropertyService.updateProperty(
+      //changed to reflect service
       propertyId,
       propertyData
     );
 
-    res.status(200).json({ message: "Propriedade atualizada com sucesso!" });
+    res
+      .status(200)
+      .json({
+        message: "Propriedade atualizada com sucesso!",
+        property: updatedProperty,
+      }); // Return the updated object
   } catch (error) {
     console.error("Error in updateProperty controller:", error);
-    if (error.code === "ER_DUP_ENTRY") {
-      // Handle duplicate property registration number
-      res.status(409).json({
-        message: "Já existe uma propriedade com este número de inscrição.",
-      });
-    } else if (error.message === "Property not found") {
-      res.status(404).json({ message: "Propriedade não encontrada." });
-    } else {
-      res.status(500).json({ message: "Erro interno do servidor." });
+    let statusCode = 500;
+    let message = "Erro interno do servidor.";
+
+    // More specific error handling.
+    if (error.message.startsWith("Invalid owner ID")) {
+      statusCode = 400;
+      message = error.message;
+    } else if (error.message === "Invalid possessor ID") {
+      statusCode = 400;
+      message = error.message;
+    } else if (error.message === "Invalid executor ID") {
+      statusCode = 400;
+      message = error.message;
+    } else if (
+      error.message === "Já existe uma pessoa cadastrada com este documento."
+    ) {
+      //from PeopleService
+      statusCode = 409; //Conflict
+      message = error.message;
+    } else if (error.code === "ER_DUP_ENTRY") {
+      statusCode = 409;
+      message = "Já existe uma propriedade com este número de inscrição.";
+    } else if (error.message === "Propriedade não encontrada") {
+      statusCode = 404;
+      message = error.message;
     }
+    res.status(statusCode).json({ message });
   }
 };
 
@@ -121,8 +156,8 @@ export const deleteProperty = async (req, res) => {
     res.status(200).json({ message: "Propriedade excluída com sucesso!" });
   } catch (error) {
     console.error("Error in deleteProperty controller: ", error);
-    if (error.message === "Property not found") {
-      res.status(404).json({ message: "Propriedade não encontrada." });
+    if (error.message === "Propriedade não encontrada") {
+      res.status(404).json({ message: error.message });
     } else {
       res.status(500).json({ message: "Erro interno do servidor." });
     }

@@ -16,8 +16,10 @@ async function createPerson(personData) {
   const newPerson = await PersonModel.createPerson(
     name,
     document_type,
-    document
-  );
+    document,
+    email,
+    phone_number
+  ); // Pass email/phone
   return newPerson;
 }
 

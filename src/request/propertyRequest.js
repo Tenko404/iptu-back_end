@@ -1,13 +1,8 @@
 import { body, param } from "express-validator";
 import { isValidCPF, isValidCNPJ } from "../services/utils.js";
-import * as PeopleService from "../services/peopleService.js";
 
 const createPropertyRequest = [
-  body("zip_code")
-    .matches(/^\d{5}-\d{3}$/)
-    .withMessage("Invalid zip code format")
-    .notEmpty()
-    .withMessage("Zip code is required"),
+  // --- Property Address ---
   body("street")
     .isLength({ max: 150 })
     .withMessage("Street must be less than 150 characters")
@@ -25,21 +20,10 @@ const createPropertyRequest = [
     .withMessage("Neighborhood is required"),
   body("complement")
     .isLength({ max: 100 })
-    .withMessage("Complement must be less than 100 characters"),
-  body("city")
-    .isLength({ max: 50 })
-    .withMessage("City must be less than 50 characters")
-    .notEmpty()
-    .withMessage("City is required")
-    .equals("Vassouras")
-    .withMessage("City must be Vassouras"),
-  body("state")
-    .isLength({ min: 2, max: 2 })
-    .withMessage("State must be a 2-letter code")
-    .notEmpty()
-    .withMessage("State is required")
-    .equals("RJ")
-    .withMessage("State must be RJ"),
+    .withMessage("Complement must be less than 100 characters")
+    .optional(),
+
+  // --- Property Information ---
   body("property_registration")
     .isInt()
     .withMessage("Property registration must be a number")
@@ -48,7 +32,7 @@ const createPropertyRequest = [
     .notEmpty()
     .withMessage("Property registration is required"),
   body("tax_type")
-    .isIn(["residential", "commercial", "both", "territorial"])
+    .isIn(["residential", "commercial", "mixed", "territorial"])
     .withMessage("Invalid tax type")
     .notEmpty()
     .withMessage("Tax type is required"),
@@ -64,113 +48,140 @@ const createPropertyRequest = [
     .withMessage("Built area is required"),
   body("front_photo").optional(),
   body("above_photo").optional(),
-  body("owner_ids")
+
+  // --- Owner Information ---
+  body("owner.name")
+    .isLength({ max: 150 })
+    .withMessage("Owner name must be less than 150 characters")
     .notEmpty()
-    .withMessage("At least one owner is required")
-    .isArray()
-    .withMessage("Needs to be an array")
-    .custom(async (ownerIds, { req }) => {
-      // Add { req } here
-      // Validate each owner_id as CPF/CNPJ
-      const invalidIds = [];
-      for (const ownerId of ownerIds) {
-        try {
-          const person = await PeopleService.checkPerson(ownerId);
-          if (!person) {
-            invalidIds.push(ownerId);
-          } else {
-            if (person.document_type === "CPF") {
-              if (!isValidCPF(person.document)) {
-                invalidIds.push(ownerId);
-              }
-            } else if (person.document_type === "CNPJ") {
-              if (!isValidCNPJ(person.document)) {
-                invalidIds.push(ownerId);
-              }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          throw new Error("Error validating the owners");
+    .withMessage("Owner name is required"),
+  body("owner.email")
+    .isEmail()
+    .withMessage("Invalid owner email format")
+    .notEmpty()
+    .withMessage("Owner email is required"),
+  body("owner.phone_number")
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid owner phone number format")
+    .notEmpty()
+    .withMessage("Owner phone number is required"),
+  body("owner.document_type")
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Owner document type must be CPF or CNPJ")
+    .notEmpty()
+    .withMessage("Owner document type is required"),
+  body("owner.document")
+    .notEmpty()
+    .withMessage("Owner document is required")
+    .custom((value, { req }) => {
+      if (req.body.owner.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
+        }
+      } else if (req.body.owner.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
         }
       }
+      return true;
+    }),
 
-      if (invalidIds.length > 0) {
-        throw new Error(`Invalid owner IDs: ${invalidIds.join(", ")}`);
-      }
-      return true; // This was missing!
-    }),
-  body("possessor.person_id")
-    .optional()
-    .custom(async (personId, { req }) => {
-      // Add { req } here
-      if (personId) {
-        try {
-          const person = await PeopleService.checkPerson(personId);
-          if (!person) {
-            throw new Error("Invalid possessor ID");
-          } else {
-            if (person.document_type === "CPF") {
-              if (!isValidCPF(person.document)) {
-                throw new Error("Invalid possessor ID");
-              }
-            } else if (person.document_type === "CNPJ") {
-              if (!isValidCNPJ(person.document)) {
-                throw new Error("Invalid possessor ID");
-              }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          throw new Error("Error validating the possessor");
+  // --- Possessor/Executor Information (Conditional) ---
+  // These validations are tricky with express-validator.  We'll do basic
+  // presence/type checks here, and more robust conditional logic in the controller.
+  body("possessor.name")
+    .if(body("possessor").exists())
+    .isLength({ max: 150 })
+    .withMessage("Possessor name must be less than 150 characters")
+    .notEmpty()
+    .withMessage("Possessor name is required"),
+  body("possessor.email")
+    .if(body("possessor").exists())
+    .isEmail()
+    .withMessage("Invalid possessor email format")
+    .notEmpty()
+    .withMessage("Possessor email is required"),
+  body("possessor.phone_number")
+    .if(body("possessor").exists())
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid possessor phone number format")
+    .notEmpty()
+    .withMessage("Possessor phone number is required"),
+  body("possessor.document_type")
+    .if(body("possessor").exists())
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Possessor document type must be CPF or CNPJ")
+    .notEmpty()
+    .withMessage("Possessor document type is required"),
+  body("possessor.document")
+    .if(body("possessor").exists())
+    .custom((value, { req }) => {
+      if (req.body.possessor.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
+        }
+      } else if (req.body.possessor.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
         }
       }
-      return true; // This was missing!
+      return true;
     }),
-  body("possessor.description")
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage("Possessor description must be less than 500 characters"),
+  body("possessor.relationship_type")
+    .if(body("possessor").exists())
+    .isIn(["possessor", "executor"])
+    .withMessage("Invalid relationship type")
+    .notEmpty()
+    .withMessage("You must select between possessor and executor"),
 
-  body("executor.person_id")
-    .optional()
-    .custom(async (personId, { req }) => {
-      // Add { req } here
-      if (personId) {
-        try {
-          const person = await PeopleService.checkPerson(personId);
-          if (!person) {
-            throw new Error("Invalid executor ID");
-          } else {
-            if (person.document_type === "CPF") {
-              if (!isValidCPF(person.document)) {
-                throw new Error("Invalid executor ID");
-              }
-            } else if (person.document_type === "CNPJ") {
-              if (!isValidCNPJ(person.document)) {
-                throw new Error("Invalid executor ID");
-              }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          throw new Error("Error validating the executor");
+  body("executor.name")
+    .if(body("executor").exists())
+    .isLength({ max: 150 })
+    .withMessage("Executor name must be less than 150 characters")
+    .notEmpty()
+    .withMessage("Executor name is required"),
+  body("executor.email")
+    .if(body("executor").exists())
+    .isEmail()
+    .withMessage("Invalid executor email format")
+    .notEmpty()
+    .withMessage("Executor email is required"),
+  body("executor.phone_number")
+    .if(body("executor").exists())
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid executor phone number format")
+    .notEmpty()
+    .withMessage("Executor phone number is required"),
+  body("executor.document_type")
+    .if(body("executor").exists())
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Executor document type must be CPF or CNPJ")
+    .notEmpty()
+    .withMessage("Executor document type is required"),
+  body("executor.document")
+    .if(body("executor").exists())
+    .custom((value, { req }) => {
+      if (req.body.executor.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
+        }
+      } else if (req.body.executor.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
         }
       }
-      return true; // This was missing!
+      return true;
     }),
-  body("executor.description")
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage("Executor description must be less than 500 characters"),
+  body("executor.relationship_type")
+    .if(body("executor").exists())
+    .isIn(["possessor", "executor"])
+    .withMessage("Invalid relationship type")
+    .notEmpty()
+    .withMessage("You must select between possessor and executor"),
 ];
 
 const updatePropertyRequest = [
   param("id").isInt().withMessage("Invalid property ID"),
-  body("zip_code")
-    .matches(/^\d{5}-\d{3}$/)
-    .withMessage("Invalid zip code format")
-    .optional(),
   body("street")
     .isLength({ max: 150 })
     .withMessage("Street must be less than 150 characters")
@@ -187,18 +198,6 @@ const updatePropertyRequest = [
     .isLength({ max: 100 })
     .withMessage("Complement must be less than 100 characters")
     .optional(),
-  body("city")
-    .isLength({ max: 50 })
-    .withMessage("City must be less than 50 characters")
-    .equals("Vassouras")
-    .withMessage("City must be Vassouras")
-    .optional(),
-  body("state")
-    .isLength({ min: 2, max: 2 })
-    .withMessage("State must be a 2-letter code")
-    .equals("RJ")
-    .withMessage("State must be RJ")
-    .optional(),
   body("property_registration")
     .isInt()
     .withMessage("Property registration must be a number")
@@ -206,7 +205,7 @@ const updatePropertyRequest = [
     .withMessage("Property registration must have 6 digits")
     .optional(),
   body("tax_type")
-    .isIn(["residential", "commercial", "both", "territorial"])
+    .isIn(["residential", "commercial", "mixed", "territorial"])
     .withMessage("Invalid tax type")
     .optional(),
   body("land_area")
@@ -219,106 +218,137 @@ const updatePropertyRequest = [
     .optional(),
   body("front_photo").optional(),
   body("above_photo").optional(),
-  body("owner_ids")
+  body("owner.name")
+    .isLength({ max: 150 })
+    .withMessage("Owner name must be less than 150 characters")
+    .optional(),
+  body("owner.email")
+    .isEmail()
+    .withMessage("Invalid owner email format")
+    .optional(),
+  body("owner.phone_number")
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid owner phone number format")
+    .optional(),
+  body("owner.document_type")
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Owner document type must be CPF or CNPJ")
+    .optional(),
+  body("owner.document")
     .optional()
-    .isArray()
-    .withMessage("Needs to be an array")
-    .custom(async (ownerIds, { req }) => {
-      //add {req}
-      if (ownerIds && ownerIds.length > 0) {
-        // Check if ownerIds exists and has elements
-        const invalidIds = [];
-        for (const ownerId of ownerIds) {
-          try {
-            const person = await PeopleService.checkPerson(ownerId);
-            if (!person) {
-              invalidIds.push(ownerId);
-            } else {
-              if (person.document_type === "CPF") {
-                if (!isValidCPF(person.document)) {
-                  invalidIds.push(ownerId);
-                }
-              } else if (person.document_type === "CNPJ") {
-                if (!isValidCNPJ(person.document)) {
-                  invalidIds.push(ownerId);
-                }
-              }
-            }
-          } catch (error) {
-            console.error(error);
-            throw new Error("Error validating the owners");
-          }
+    .custom((value, { req }) => {
+      if (req.body.owner && req.body.owner.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
         }
+      } else if (req.body.owner && req.body.owner.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
+        }
+      }
+      return true;
+    }),
+  body("possessor.name")
+    .if(body("possessor").exists())
+    .isLength({ max: 150 })
+    .withMessage("Possessor name must be less than 150 characters")
+    .notEmpty()
+    .withMessage("Possessor name is required")
+    .optional(),
+  body("possessor.email")
+    .if(body("possessor").exists())
+    .isEmail()
+    .withMessage("Invalid possessor email format")
+    .notEmpty()
+    .withMessage("Possessor email is required")
+    .optional(),
+  body("possessor.phone_number")
+    .if(body("possessor").exists())
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid possessor phone number format")
+    .notEmpty()
+    .withMessage("Possessor phone number is required")
+    .optional(),
+  body("possessor.document_type")
+    .if(body("possessor").exists())
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Possessor document type must be CPF or CNPJ")
+    .notEmpty()
+    .withMessage("Possessor document type is required")
+    .optional(),
+  body("possessor.document")
+    .if(body("possessor").exists())
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.possessor.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
+        }
+      } else if (req.body.possessor.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
+        }
+      }
+      return true;
+    }),
+  body("possessor.relationship_type")
+    .if(body("possessor").exists())
+    .isIn(["possessor", "executor"])
+    .withMessage("Invalid relationship type")
+    .notEmpty()
+    .withMessage("You must select between possessor and executor")
+    .optional(),
 
-        if (invalidIds.length > 0) {
-          throw new Error(`Invalid owner IDs: ${invalidIds.join(", ")}`);
+  body("executor.name")
+    .if(body("executor").exists())
+    .isLength({ max: 150 })
+    .withMessage("Executor name must be less than 150 characters")
+    .notEmpty()
+    .withMessage("Executor name is required")
+    .optional(),
+  body("executor.email")
+    .if(body("executor").exists())
+    .isEmail()
+    .withMessage("Invalid executor email format")
+    .notEmpty()
+    .withMessage("Executor email is required")
+    .optional(),
+  body("executor.phone_number")
+    .if(body("executor").exists())
+    .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage("Invalid executor phone number format")
+    .notEmpty()
+    .withMessage("Executor phone number is required")
+    .optional(),
+  body("executor.document_type")
+    .if(body("executor").exists())
+    .isIn(["CPF", "CNPJ"])
+    .withMessage("Executor document type must be CPF or CNPJ")
+    .notEmpty()
+    .withMessage("Executor document type is required")
+    .optional(),
+  body("executor.document")
+    .if(body("executor").exists())
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.executor.document_type === "CPF") {
+        if (!isValidCPF(value)) {
+          throw new Error("Invalid CPF");
+        }
+      } else if (req.body.executor.document_type === "CNPJ") {
+        if (!isValidCNPJ(value)) {
+          throw new Error("Invalid CNPJ");
         }
       }
-      return true; // This was missing!
+      return true;
     }),
-  body("possessor.person_id")
-    .optional()
-    .custom(async (personId, { req }) => {
-      // Add { req } here
-      if (personId) {
-        try {
-          const person = await PeopleService.checkPerson(personId);
-          if (!person) {
-            throw new Error("Invalid possessor ID");
-          } else {
-            if (person.document_type === "CPF") {
-              if (!isValidCPF(person.document)) {
-                throw new Error("Invalid possessor ID");
-              }
-            } else if (person.document_type === "CNPJ") {
-              if (!isValidCNPJ(person.document)) {
-                throw new Error("Invalid possessor ID");
-              }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          throw new Error("Error validating the possessor");
-        }
-      }
-      return true; // This was missing!
-    }),
-  body("possessor.description")
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage("Possessor description must be less than 500 characters"),
-
-  body("executor.person_id")
-    .optional()
-    .custom(async (personId, { req }) => {
-      // Add { req } here
-      if (personId) {
-        try {
-          const person = await PeopleService.checkPerson(personId);
-          if (!person) {
-            throw new Error("Invalid executor ID");
-          } else {
-            if (person.document_type === "CPF") {
-              if (!isValidCPF(person.document)) {
-                throw new Error("Invalid executor ID");
-              }
-            } else if (person.document_type === "CNPJ") {
-              if (!isValidCNPJ(person.document)) {
-                throw new Error("Invalid executor ID");
-              }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          throw new Error("Error validating the executor");
-        }
-      }
-      return true; // This was missing!
-    }),
-  body("executor.description")
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage("Executor description must be less than 500 characters"),
+  body("executor.relationship_type")
+    .if(body("executor").exists())
+    .isIn(["possessor", "executor"])
+    .withMessage("Invalid relationship type")
+    .notEmpty()
+    .withMessage("You must select between possessor and executor")
+    .optional(),
 ];
 
 export { createPropertyRequest, updatePropertyRequest };

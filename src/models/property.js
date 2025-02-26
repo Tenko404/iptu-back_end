@@ -2,13 +2,10 @@ import pool from "../config/db.js";
 
 async function createProperty(propertyData) {
   const {
-    zip_code,
     street,
     house_number,
     neighborhood,
     complement,
-    city,
-    state,
     property_registration,
     tax_type,
     land_area,
@@ -20,17 +17,14 @@ async function createProperty(propertyData) {
   try {
     const [result] = await pool.query(
       `
-      INSERT INTO properties (zip_code, street, house_number, neighborhood, complement, city, state, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO properties (street, house_number, neighborhood, complement, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
-        zip_code,
         street,
         house_number,
         neighborhood,
         complement,
-        city,
-        state,
         property_registration,
         tax_type,
         land_area,
@@ -40,7 +34,7 @@ async function createProperty(propertyData) {
       ]
     );
 
-    return { id: result.insertId }; //return the id of the created property
+    return { id: result.insertId };
   } catch (error) {
     console.error("Error in createProperty:", error);
     throw error;
@@ -72,13 +66,10 @@ async function getAllProperties() {
 async function updateProperty(id, propertyData) {
   try {
     const {
-      zip_code,
       street,
       house_number,
       neighborhood,
       complement,
-      city,
-      state,
       property_registration,
       tax_type,
       land_area,
@@ -88,17 +79,14 @@ async function updateProperty(id, propertyData) {
     } = propertyData;
 
     const [result] = await pool.query(
-      `UPDATE properties SET zip_code = ?, street = ?, house_number = ?, neighborhood = ?,
-        complement = ?, city = ?, state = ?, property_registration = ?, tax_type = ?, land_area = ?, built_area = ?,
+      `UPDATE properties SET street = ?, house_number = ?, neighborhood = ?,
+        complement = ?, property_registration = ?, tax_type = ?, land_area = ?, built_area = ?,
         front_photo = ?, above_photo = ? WHERE id = ?`,
       [
-        zip_code,
         street,
         house_number,
         neighborhood,
         complement,
-        city,
-        state,
         property_registration,
         tax_type,
         land_area,
@@ -109,12 +97,13 @@ async function updateProperty(id, propertyData) {
       ]
     );
 
-    return result; //return the result
+    return result;
   } catch (error) {
     console.error("Error in updateProperty: ", error);
     throw error;
   }
 }
+
 async function deleteProperty(id) {
   try {
     const [result] = await pool.query("DELETE FROM properties WHERE id = ?", [
@@ -138,59 +127,30 @@ async function linkPropertyToPerson(
       "INSERT INTO property_people (property_id, person_id, relationship_type, description) VALUES (?, ?, ?, ?)",
       [propertyId, personId, relationshipType, description]
     );
-    return result; //return the result
+    return result;
   } catch (error) {
     console.error("Error in linkPropertyToPerson: ", error);
     throw error;
   }
 }
-async function getOwnersByPropertyId(propertyId) {
+
+// NEW FUNCTION (replaces getOwnersByPropertyId, etc.)
+async function getPeopleByPropertyId(propertyId) {
   try {
     const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.document, p.document_type
+      `SELECT p.id, p.name, p.document, p.document_type, pp.relationship_type, pp.description
         FROM people p
         INNER JOIN property_people pp ON p.id = pp.person_id
-        WHERE pp.property_id = ? AND pp.relationship_type = 'owner'`,
+        WHERE pp.property_id = ?`,
       [propertyId]
     );
     return rows;
   } catch (error) {
-    console.error("Error in getOwnersByPropertyId:");
+    console.error("Error in getPeopleByPropertyId:", error);
     throw error;
   }
 }
 
-async function getPossessorByPropertyId(propertyId) {
-  try {
-    const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.document, p.document_type, pp.description
-        FROM people p
-        INNER JOIN property_people pp ON p.id = pp.person_id
-        WHERE pp.property_id = ? AND pp.relationship_type = 'possessor'`,
-      [propertyId]
-    );
-    return rows[0];
-  } catch (error) {
-    console.error("Error in getPossessorByPropertyId:");
-    throw error;
-  }
-}
-
-async function getExecutorByPropertyId(propertyId) {
-  try {
-    const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.document, p.document_type, pp.description
-        FROM people p
-        INNER JOIN property_people pp ON p.id = pp.person_id
-        WHERE pp.property_id = ? AND pp.relationship_type = 'executor'`,
-      [propertyId]
-    );
-    return rows[0];
-  } catch (error) {
-    console.error("Error in getExecutorByPropertyId:");
-    throw error;
-  }
-}
 async function removePropertyPeople(propertyId) {
   try {
     const [result] = await pool.query(
@@ -203,6 +163,12 @@ async function removePropertyPeople(propertyId) {
     throw error;
   }
 }
+
+// REMOVE THESE FUNCTIONS:
+// async function getOwnersByPropertyId(propertyId) { ... }
+// async function getPossessorByPropertyId(propertyId) { ... }
+// async function getExecutorByPropertyId(propertyId) { ... }
+
 export {
   createProperty,
   getPropertyById,
@@ -210,8 +176,6 @@ export {
   updateProperty,
   deleteProperty,
   linkPropertyToPerson,
-  getOwnersByPropertyId,
-  getPossessorByPropertyId,
-  getExecutorByPropertyId,
+  getPeopleByPropertyId, // Export the new function
   removePropertyPeople,
 };
