@@ -1,6 +1,7 @@
 import pool from "../config/db.js";
 
-async function createProperty(propertyData) {
+async function createProperty(propertyData, connection) {
+  // Add connection parameter
   const {
     street,
     house_number,
@@ -15,7 +16,8 @@ async function createProperty(propertyData) {
   } = propertyData;
 
   try {
-    const [result] = await pool.query(
+    const [result] = await connection.query(
+      // Use connection, not pool
       `
       INSERT INTO properties (street, house_number, neighborhood, complement, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -37,11 +39,12 @@ async function createProperty(propertyData) {
     return { id: result.insertId };
   } catch (error) {
     console.error("Error in createProperty:", error);
-    throw error;
+    throw error; // No need to rollback here, service layer handles it
   }
 }
 
 async function getPropertyById(id) {
+  // No connection needed
   try {
     const [rows] = await pool.query("SELECT * FROM properties WHERE id = ?", [
       id,
@@ -54,6 +57,7 @@ async function getPropertyById(id) {
 }
 
 async function getAllProperties() {
+  // No connection needed
   try {
     const [rows] = await pool.query("SELECT * FROM properties");
     return rows;
@@ -63,7 +67,8 @@ async function getAllProperties() {
   }
 }
 
-async function updateProperty(id, propertyData) {
+async function updateProperty(id, propertyData, connection) {
+  // Add connection
   try {
     const {
       street,
@@ -78,7 +83,8 @@ async function updateProperty(id, propertyData) {
       above_photo,
     } = propertyData;
 
-    const [result] = await pool.query(
+    const [result] = await connection.query(
+      // Use connection
       `UPDATE properties SET street = ?, house_number = ?, neighborhood = ?,
         complement = ?, property_registration = ?, tax_type = ?, land_area = ?, built_area = ?,
         front_photo = ?, above_photo = ? WHERE id = ?`,
@@ -104,11 +110,14 @@ async function updateProperty(id, propertyData) {
   }
 }
 
-async function deleteProperty(id) {
+async function deleteProperty(propertyId, connection) {
+  // Add connection
   try {
-    const [result] = await pool.query("DELETE FROM properties WHERE id = ?", [
-      id,
-    ]);
+    const [result] = await connection.query(
+      // Use connection, not pool
+      "DELETE FROM properties WHERE id = ?",
+      [propertyId]
+    );
     return result;
   } catch (error) {
     console.error("Error in deleteProperty: ", error);
@@ -120,10 +129,13 @@ async function linkPropertyToPerson(
   propertyId,
   personId,
   relationshipType,
-  description
+  description,
+  connection
 ) {
+  // Add connection
   try {
-    const [result] = await pool.query(
+    const [result] = await connection.query(
+      // Use connection
       "INSERT INTO property_people (property_id, person_id, relationship_type, description) VALUES (?, ?, ?, ?)",
       [propertyId, personId, relationshipType, description]
     );
@@ -134,8 +146,8 @@ async function linkPropertyToPerson(
   }
 }
 
-// NEW FUNCTION (replaces getOwnersByPropertyId, etc.)
 async function getPeopleByPropertyId(propertyId) {
+  // No connection needed
   try {
     const [rows] = await pool.query(
       `SELECT p.id, p.name, p.document, p.document_type, pp.relationship_type, pp.description
@@ -151,9 +163,11 @@ async function getPeopleByPropertyId(propertyId) {
   }
 }
 
-async function removePropertyPeople(propertyId) {
+async function removePropertyPeople(propertyId, connection) {
+  // Add connection
   try {
-    const [result] = await pool.query(
+    const [result] = await connection.query(
+      // Use connection
       "DELETE FROM property_people WHERE property_id = ?",
       [propertyId]
     );
@@ -164,11 +178,6 @@ async function removePropertyPeople(propertyId) {
   }
 }
 
-// REMOVE THESE FUNCTIONS:
-// async function getOwnersByPropertyId(propertyId) { ... }
-// async function getPossessorByPropertyId(propertyId) { ... }
-// async function getExecutorByPropertyId(propertyId) { ... }
-
 export {
   createProperty,
   getPropertyById,
@@ -176,6 +185,6 @@ export {
   updateProperty,
   deleteProperty,
   linkPropertyToPerson,
-  getPeopleByPropertyId, // Export the new function
+  getPeopleByPropertyId,
   removePropertyPeople,
 };

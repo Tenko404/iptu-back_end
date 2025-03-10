@@ -1,10 +1,11 @@
+import pool from "../config/db.js"; // Import the connection pool!
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
 
 async function createProperty(propertyData) {
-  const connection = await pool.getConnection();
+  const connection = await pool.getConnection(); // Get a connection
   try {
-    await connection.beginTransaction();
+    await connection.beginTransaction(); // Start transaction
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
@@ -87,7 +88,10 @@ async function createProperty(propertyData) {
     }
 
     // --- 4. Create the Property ---
-    const newProperty = await PropertyModel.createProperty(otherPropertyData);
+    const newProperty = await PropertyModel.createProperty(
+      otherPropertyData,
+      connection
+    ); // Pass connection
 
     // --- 5. Link relationships ---
     await PropertyModel.linkPropertyToPerson(
@@ -96,7 +100,7 @@ async function createProperty(propertyData) {
       "owner",
       null,
       connection
-    ); // Always link the owner
+    ); // Pass connection
     if (possessorId) {
       await PropertyModel.linkPropertyToPerson(
         newProperty.id,
@@ -104,7 +108,7 @@ async function createProperty(propertyData) {
         "possessor",
         possessor.description,
         connection
-      );
+      ); // Pass connection
     }
     if (executorId) {
       await PropertyModel.linkPropertyToPerson(
@@ -113,10 +117,10 @@ async function createProperty(propertyData) {
         "executor",
         executor.description,
         connection
-      );
+      ); // Pass connection
     }
 
-    await connection.commit();
+    await connection.commit(); // Commit transaction
     return {
       id: newProperty.id,
       ...otherPropertyData,
@@ -125,11 +129,11 @@ async function createProperty(propertyData) {
       executor: executorId ? { id: executorId, ...executor } : null, // Include executor details if present
     };
   } catch (error) {
-    await connection.rollback();
+    await connection.rollback(); // Rollback on error
     console.error("Transaction rolled back:", error);
-    throw error;
+    throw error; // Re-throw to be handled by controller
   } finally {
-    connection.release();
+    connection.release(); // Always release connection
   }
 }
 
@@ -285,7 +289,7 @@ async function updateProperty(propertyId, propertyData) {
       propertyId,
       filteredUpdateData,
       connection
-    );
+    ); // Pass connection
 
     // --- 5. Update relationships (Remove and Re-add) ---
     await PropertyModel.removePropertyPeople(propertyId, connection); // Correct
@@ -305,7 +309,7 @@ async function updateProperty(propertyId, propertyData) {
         "possessor",
         possessor.description,
         connection
-      );
+      ); // Pass connection
     }
     if (executorId) {
       await PropertyModel.linkPropertyToPerson(
@@ -314,16 +318,16 @@ async function updateProperty(propertyId, propertyData) {
         "executor",
         executor.description,
         connection
-      );
+      ); // Pass connection
     }
 
     await connection.commit(); // Commit
     return {
       id: propertyId,
-      ...otherPropertyData,
-      owner: { id: ownerId, ...owner }, // Include owner details in response
-      possessor: possessorId ? { id: possessorId, ...possessor } : null, // Include possessor details if present
-      executor: executorId ? { id: executorId, ...executor } : null, // Include executor details if present
+      ...filteredUpdateData,
+      owner: { id: ownerId, ...owner },
+      possessor: possessorId ? { id: possessorId, ...possessor } : null,
+      executor: executorId ? { id: executorId, ...executor } : null,
     };
   } catch (error) {
     await connection.rollback(); // Rollback

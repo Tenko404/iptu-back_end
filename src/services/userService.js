@@ -9,13 +9,13 @@ async function login(employeeId, password) {
   const user = await UserModel.getUserByEmployeeId(employeeId);
 
   if (!user) {
-    throw new Error("Usuário não encontrado."); // Throw error handled in controller
+    throw new Error("Usuário não encontrado"); // Throw error handled in controller
   }
 
   const passwordMatch = await bcrypt.compare(password, user.employee_password);
 
   if (!passwordMatch) {
-    throw new Error("Credenciais inválidas."); // Throw error handled in controller
+    throw new Error("Credenciais inválidas"); // Throw error handled in controller
   }
 
   // Generate JWT

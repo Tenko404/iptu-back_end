@@ -17,7 +17,7 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error("Error in login controller:", error);
 
-    if (error.message === "Invalid credentials") {
+    if (error.message === "Credenciais inválidas") {
       res.status(401).json({ message: "Credenciais inválidas" });
     } else if (error.message === "User not found") {
       res.status(404).json({ message: "Usuário não encontrado" });
