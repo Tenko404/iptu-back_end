@@ -1,5 +1,5 @@
 import { body, param } from "express-validator";
-import { isValidCPF, isValidCNPJ } from "../services/utils.js";
+// REMOVED: import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // No longer needed here
 
 const createPropertyRequest = [
   // --- Property Address ---
@@ -71,24 +71,11 @@ const createPropertyRequest = [
     .notEmpty()
     .withMessage("Owner document type is required"),
   body("owner.document")
-    .notEmpty()
-    .withMessage("Owner document is required")
-    .custom((value, { req }) => {
-      if (req.body.owner.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.owner.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+    .notEmpty() // Keep this to ensure *something* is provided
+    .withMessage("Owner document is required"),
+  // REMOVED the .custom validator
 
   // --- Possessor/Executor Information (Conditional) ---
-  // These validations are tricky with express-validator.  We'll do basic
-  // presence/type checks here, and more robust conditional logic in the controller.
   body("possessor.name")
     .if(body("possessor").exists())
     .isLength({ max: 150 })
@@ -115,18 +102,8 @@ const createPropertyRequest = [
     .withMessage("Possessor document type is required"),
   body("possessor.document")
     .if(body("possessor").exists())
-    .custom((value, { req }) => {
-      if (req.body.possessor.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.possessor.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+    .notEmpty() // Keep this
+    .withMessage("Possessor document is required"),
   body("possessor.relationship_type")
     .if(body("possessor").exists())
     .isIn(["possessor", "executor"])
@@ -160,18 +137,8 @@ const createPropertyRequest = [
     .withMessage("Executor document type is required"),
   body("executor.document")
     .if(body("executor").exists())
-    .custom((value, { req }) => {
-      if (req.body.executor.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.executor.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+    .notEmpty() // Keep this
+    .withMessage("Executor document is required"),
   body("executor.relationship_type")
     .if(body("executor").exists())
     .isIn(["possessor", "executor"])
@@ -234,120 +201,59 @@ const updatePropertyRequest = [
     .isIn(["CPF", "CNPJ"])
     .withMessage("Owner document type must be CPF or CNPJ")
     .optional(),
-  body("owner.document")
-    .optional()
-    .custom((value, { req }) => {
-      if (req.body.owner && req.body.owner.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.owner && req.body.owner.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+  body("owner.document").optional(),
   body("possessor.name")
     .if(body("possessor").exists())
     .isLength({ max: 150 })
     .withMessage("Possessor name must be less than 150 characters")
-    .notEmpty()
-    .withMessage("Possessor name is required")
     .optional(),
   body("possessor.email")
     .if(body("possessor").exists())
     .isEmail()
     .withMessage("Invalid possessor email format")
-    .notEmpty()
-    .withMessage("Possessor email is required")
     .optional(),
   body("possessor.phone_number")
     .if(body("possessor").exists())
     .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
     .withMessage("Invalid possessor phone number format")
-    .notEmpty()
-    .withMessage("Possessor phone number is required")
     .optional(),
   body("possessor.document_type")
     .if(body("possessor").exists())
     .isIn(["CPF", "CNPJ"])
     .withMessage("Possessor document type must be CPF or CNPJ")
-    .notEmpty()
-    .withMessage("Possessor document type is required")
     .optional(),
-  body("possessor.document")
-    .if(body("possessor").exists())
-    .optional()
-    .custom((value, { req }) => {
-      if (req.body.possessor.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.possessor.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+  body("possessor.document").if(body("possessor").exists()).optional(),
   body("possessor.relationship_type")
     .if(body("possessor").exists())
     .isIn(["possessor", "executor"])
     .withMessage("Invalid relationship type")
-    .notEmpty()
-    .withMessage("You must select between possessor and executor")
     .optional(),
 
   body("executor.name")
     .if(body("executor").exists())
     .isLength({ max: 150 })
     .withMessage("Executor name must be less than 150 characters")
-    .notEmpty()
-    .withMessage("Executor name is required")
     .optional(),
   body("executor.email")
     .if(body("executor").exists())
     .isEmail()
     .withMessage("Invalid executor email format")
-    .notEmpty()
-    .withMessage("Executor email is required")
     .optional(),
   body("executor.phone_number")
     .if(body("executor").exists())
     .matches(/^\+55 \(\d{2}\) \d{4,5}-\d{4}$/)
     .withMessage("Invalid executor phone number format")
-    .notEmpty()
-    .withMessage("Executor phone number is required")
     .optional(),
   body("executor.document_type")
     .if(body("executor").exists())
     .isIn(["CPF", "CNPJ"])
     .withMessage("Executor document type must be CPF or CNPJ")
-    .notEmpty()
-    .withMessage("Executor document type is required")
     .optional(),
-  body("executor.document")
-    .if(body("executor").exists())
-    .optional()
-    .custom((value, { req }) => {
-      if (req.body.executor.document_type === "CPF") {
-        if (!isValidCPF(value)) {
-          throw new Error("Invalid CPF");
-        }
-      } else if (req.body.executor.document_type === "CNPJ") {
-        if (!isValidCNPJ(value)) {
-          throw new Error("Invalid CNPJ");
-        }
-      }
-      return true;
-    }),
+  body("executor.document").if(body("executor").exists()).optional(),
   body("executor.relationship_type")
     .if(body("executor").exists())
     .isIn(["possessor", "executor"])
     .withMessage("Invalid relationship type")
-    .notEmpty()
-    .withMessage("You must select between possessor and executor")
     .optional(),
 ];
 

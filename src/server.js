@@ -4,6 +4,8 @@ import routes from "./routes/routes.js";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import multer from "multer"; // For file uploads
+import { unflatten } from "flat"; // Import unflatten
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +16,7 @@ const app = express();
 
 // --- Middleware ---
 
-// CORS (Cross-Origin Resource Sharing)
+// CORS
 app.use(cors());
 
 // Parse JSON request bodies
@@ -23,13 +25,21 @@ app.use(express.json());
 // Parse URL-encoded request bodies (for form data)
 app.use(express.urlencoded({ extended: true }));
 
+// Add middleware to unflatten the request body
+app.use((req, res, next) => {
+  if (req.body) {
+    req.body = unflatten(req.body);
+  }
+  next();
+});
+
 // --- Routes ---
 app.use(routes);
 
 // --- Serve Static Files (Uploaded Images) ---
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
-// --- Error Handling Middleware (Centralized) ---
 
+// --- Error Handling Middleware (Centralized) ---
 app.use((err, req, res, next) => {
   console.error(err); // Log the error
 
