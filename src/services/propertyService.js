@@ -2,6 +2,66 @@ import pool from "../config/db.js"; // Import the connection pool!
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
 
+// --- Helper Function: findOrCreatePerson (WITH proper error handling) ---
+async function findOrCreatePerson(personData, connection) {
+  if (!personData) {
+    return null;
+  }
+
+  const { name, email, phone_number, document_type, document } = personData;
+
+  if (!document_type || !document) {
+    throw new Error("Document type and document are required for person.");
+  }
+
+  try {
+    // 1. Try to find existing person - USE THE CONNECTION
+    let existingPerson = await PersonModel.getPersonByDocument(
+      document_type,
+      document,
+      connection // Pass the connection
+    );
+
+    if (existingPerson) {
+      // 2. Person exists: Update details (if provided) - USE THE CONNECTION
+      const updateData = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (phone_number) updateData.phone_number = phone_number;
+      if (document_type) updateData.document_type = document_type;
+      if (document) updateData.document = document;
+
+      if (Object.keys(updateData).length > 0) {
+        await PersonModel.updatePerson(
+          existingPerson.id,
+          updateData,
+          connection // Pass the connection
+        );
+      }
+      return existingPerson.id;
+    } else {
+      // 3. Person doesn't exist: Create new person - USE THE CONNECTION
+      if (!name || !email || !phone_number) {
+        throw new Error(
+          "Name, email, and phone number are required to create a new person."
+        );
+      }
+      const newPerson = await PersonModel.createPerson(
+        name,
+        document_type,
+        document,
+        email,
+        phone_number,
+        connection // Pass the connection
+      );
+      return newPerson.id;
+    }
+  } catch (error) {
+    console.error("Error in findOrCreatePerson:", error);
+    throw error;
+  }
+}
+
 async function createProperty(propertyData) {
   const connection = await pool.getConnection(); // Get a connection
   try {
@@ -140,7 +200,8 @@ async function createProperty(propertyData) {
 async function getPropertyById(propertyId) {
   const property = await PropertyModel.getPropertyById(propertyId);
   if (!property) {
-    return null;
+    console.log("Error message being thrown:", "Propriedade não encontrada."); // ADD THIS LINE
+    throw new Error("Propriedade não encontrada.");
   }
 
   // Use the new getPeopleByPropertyId function
@@ -173,170 +234,114 @@ async function getAllProperties() {
   return propertiesWithPeople;
 }
 
+// --- updateProperty (Refactored - Uses findOrCreatePerson) ---
 async function updateProperty(propertyId, propertyData) {
   const connection = await pool.getConnection();
+  console.log("10. Inside updateProperty service, propertyId:", propertyId);
+  console.log("11. Inside updateProperty service, propertyData:", propertyData);
+
   try {
     await connection.beginTransaction();
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
-    // --- Check if Property Exists ---
-    const propertyExists = await PropertyModel.getPropertyById(propertyId);
-    if (!propertyExists) {
-      throw new Error("Propriedade não encontrada.");
-    }
-
-    // --- 1. Handle Owner ---
-    //For simplicity, let's consider the owner is always sent on update
-    const existingOwner = await PersonModel.getPersonByDocument(
-      owner.document_type,
-      owner.document
+    console.log(
+      "13. Proceeding with update (Controller already checked existence)."
     );
-    if (existingOwner) {
-      throw new Error("Já existe uma pessoa cadastrada com este documento.");
+
+    // --- 1. Retrieve Existing Property Data ---
+    const existingProperty = await PropertyModel.getPropertyById(propertyId);
+    if (!existingProperty) {
+      //This error should never happen, but...
+      throw new Error("Propriedade não encontrada."); // This error should be handled by the caller
     }
-    const updatedOwner = await PersonModel.createPerson(
-      //creates the new owner
-      owner.name,
-      owner.document_type,
-      owner.document,
-      owner.email,
-      owner.phone_number
+
+    console.log("Existing Property:", existingProperty); // ADD THIS
+    const mergedPropertyData = {
+      ...existingProperty,
+      ...otherPropertyData,
+    };
+    console.log("Merged Property Data:", mergedPropertyData); // ADD THIS
+
+    // Use the helper function for owner, possessor, and executor
+    const ownerId = await findOrCreatePerson(owner, connection);
+    const possessorId = await findOrCreatePerson(possessor, connection);
+    const executorId = await findOrCreatePerson(executor, connection);
+
+    // --- 3. Update Property Details (using MERGED data) ---
+    await PropertyModel.updateProperty(
+      propertyId,
+      mergedPropertyData, // Update with MERGED data
+      connection
     );
-    const ownerId = updatedOwner.id; //gets the id
 
-    // --- 2. Handle Possessor (Optional) ---
-    let possessorId = null;
-    if (possessor) {
-      try {
-        if (
-          !possessor.name ||
-          !possessor.email ||
-          !possessor.phone_number ||
-          !possessor.document_type ||
-          !possessor.document ||
-          !possessor.relationship_type
-        ) {
-          throw new Error("Possessor data is incomplete.");
-        }
-        const existingPossessor = await PersonModel.getPersonByDocument(
-          possessor.document_type,
-          possessor.document
-        );
-        if (existingPossessor) {
-          throw new Error(
-            "Já existe uma pessoa cadastrada com este documento."
-          );
-        }
-        const newPossessor = await PersonModel.createPerson(
-          possessor.name,
-          possessor.document_type,
-          possessor.document,
-          possessor.email,
-          possessor.phone_number
-        );
-        possessorId = newPossessor.id;
-      } catch (error) {
-        await connection.rollback();
-        throw error;
-      }
-    }
-
-    // --- 3. Handle Executor (Optional) ---
-    let executorId = null;
-    if (executor) {
-      try {
-        if (
-          !executor.name ||
-          !executor.email ||
-          !executor.phone_number ||
-          !executor.document_type ||
-          !executor.document ||
-          !executor.relationship_type
-        ) {
-          throw new Error("Executor data is incomplete.");
-        }
-        const existingExecutor = await PersonModel.getPersonByDocument(
-          executor.document_type,
-          executor.document
-        );
-        if (existingExecutor) {
-          throw new Error(
-            "Já existe uma pessoa cadastrada com este documento."
-          );
-        }
-        const newExecutor = await PersonModel.createPerson(
-          executor.name,
-          executor.document_type,
-          executor.document,
-          executor.email,
-          executor.phone_number
-        );
-        executorId = newExecutor.id;
-      } catch (error) {
-        await connection.rollback();
-        throw error;
-      }
-    }
-
-    // --- 4. Update Property Details ---
+    // Update Property Details
     const filteredUpdateData = Object.fromEntries(
       Object.entries(otherPropertyData).filter(
         ([key, value]) => value !== undefined
       )
     );
-    await PropertyModel.updateProperty(
-      propertyId,
-      filteredUpdateData,
-      connection
-    ); // Pass connection
 
-    // --- 5. Update relationships (Remove and Re-add) ---
-    await PropertyModel.removePropertyPeople(propertyId, connection); // Correct
+    if (Object.keys(filteredUpdateData).length > 0) {
+      await PropertyModel.updateProperty(
+        propertyId,
+        filteredUpdateData,
+        connection
+      );
+    }
 
-    await PropertyModel.linkPropertyToPerson(
-      propertyId,
-      ownerId,
-      "owner",
-      null,
-      connection
-    ); // Always link the owner
+    // Update relationships (Remove and Re-add)
+    await PropertyModel.removePropertyPeople(propertyId, connection);
+
+    // Always link the owner
+    if (ownerId) {
+      await PropertyModel.linkPropertyToPerson(
+        propertyId,
+        ownerId,
+        "owner",
+        null,
+        connection
+      );
+    }
 
     if (possessorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
         possessorId,
         "possessor",
-        possessor.description,
+        possessor?.description,
         connection
-      ); // Pass connection
+      );
     }
     if (executorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
         executorId,
         "executor",
-        executor.description,
+        executor?.description,
         connection
-      ); // Pass connection
+      );
     }
 
-    await connection.commit(); // Commit
+    await connection.commit();
+    console.log("14. Transaction committed.");
     return {
       id: propertyId,
-      ...filteredUpdateData,
-      owner: { id: ownerId, ...owner },
+      ...mergedPropertyData, // MODIFIED
+      owner: ownerId ? { id: ownerId, ...owner } : null,
       possessor: possessorId ? { id: possessorId, ...possessor } : null,
       executor: executorId ? { id: executorId, ...executor } : null,
     };
   } catch (error) {
-    await connection.rollback(); // Rollback
+    await connection.rollback();
     console.error("Transaction rolled back (UPDATE):", error);
-    throw error;
+    throw error; // Re-throw to be handled by the controller
   } finally {
-    connection.release(); // Release
+    connection.release();
+    console.log("16. Connection released");
   }
 }
+
 async function deleteProperty(propertyId) {
   const connection = await pool.getConnection(); // Get connection
   try {
