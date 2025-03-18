@@ -67,39 +67,38 @@ async function getAllProperties() {
   }
 }
 
+// property.js
+
+// property.js
 async function updateProperty(id, propertyData, connection) {
-  // Add connection
   try {
-    const {
-      street,
-      house_number,
-      neighborhood,
-      complement,
-      property_registration,
-      tax_type,
-      land_area,
-      built_area,
-      front_photo,
-      above_photo,
-    } = propertyData;
+    // NO DESTRUCTURING of propertyData here
 
     const [result] = await connection.query(
-      // Use connection
-      `UPDATE properties SET street = ?, house_number = ?, neighborhood = ?,
-        complement = ?, property_registration = ?, tax_type = ?, land_area = ?, built_area = ?,
-        front_photo = ?, above_photo = ? WHERE id = ?`,
+      `UPDATE properties SET
+          street = ?,
+          house_number = ?,
+          neighborhood = ?,
+          complement = ?,
+          property_registration = ?,
+          tax_type = ?,
+          land_area = ?,
+          built_area = ?,
+          front_photo = ?,
+          above_photo = ?
+      WHERE id = ?`,
       [
-        street,
-        house_number,
-        neighborhood,
-        complement,
-        property_registration,
-        tax_type,
-        land_area,
-        built_area,
-        front_photo,
-        above_photo,
-        id,
+        propertyData.street,
+        propertyData.house_number,
+        propertyData.neighborhood,
+        propertyData.complement,
+        propertyData.property_registration,
+        propertyData.tax_type,
+        propertyData.land_area,
+        propertyData.built_area,
+        propertyData.front_photo,
+        propertyData.above_photo,
+        id, // The ID for the WHERE clause
       ]
     );
 
@@ -178,6 +177,19 @@ async function removePropertyPeople(propertyId, connection) {
   }
 }
 
+async function propertyExists(propertyId) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT 1 FROM properties WHERE id = ?", // Efficient existence check
+      [propertyId]
+    );
+    return rows.length > 0; // Return true if any rows are found, false otherwise
+  } catch (error) {
+    console.error("Error in propertyExists:", error);
+    throw error; // Re-throw for controller to handle
+  }
+}
+
 export {
   createProperty,
   getPropertyById,
@@ -187,4 +199,5 @@ export {
   linkPropertyToPerson,
   getPeopleByPropertyId,
   removePropertyPeople,
+  propertyExists,
 };
