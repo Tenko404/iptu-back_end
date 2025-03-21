@@ -106,7 +106,10 @@ export const getPropertyById = async (req, res) => {
     res.status(200).json(property);
   } catch (error) {
     console.error("Error in getPropertyById controller:", error);
-    res.status(500).json({ message: "Erro interno do servidor." });
+    if (error.message === "Propriedade não encontrada") {
+      return res.status(404).json({ message: "Propriedade não encontrada" });
+    }
+    return res.status(500).json({ message: "Erro interno do servidor." });
   }
 };
 
@@ -249,7 +252,7 @@ export const updateProperty = async (req, res) => {
       statusCode = 409;
       message = "Já existe uma propriedade com este número de inscrição.";
     }
-    res.status(statusCode).json({ message });
+    return res.status(statusCode).json({ message });
   }
 };
 
@@ -258,11 +261,11 @@ export const deleteProperty = async (req, res) => {
     const propertyId = req.params.id;
     await PropertyService.deleteProperty(propertyId);
 
-    res.status(200).json({ message: "Propriedade excluída com sucesso!" });
+    res.status(200).json({ message: "Property deleted successfully!" });
   } catch (error) {
-    console.error("Error in deleteProperty controller: ", error);
-    if (error.message === "Propriedade não encontrada") {
-      res.status(404).json({ message: error.message });
+    console.error("Error in deleteProperty controller:", error);
+    if (error.message === "Property not found") {
+      res.status(404).json({ message: "Property not found" });
     } else {
       res.status(500).json({ message: "Erro interno do servidor." });
     }
