@@ -20,12 +20,6 @@ const router = express.Router();
 router.post("/api/users/login", loginRequest, UserController.login); // No authentication required for login
 
 // --- People Routes ---
-router.post(
-  "/api/people",
-  verifyToken,
-  createPersonRequest,
-  PeopleController.createPerson
-); // Requires authentication
 router.get("/api/people/:id", verifyToken, PeopleController.getPersonById); // Requires authentication
 router.get("/api/people", verifyToken, PeopleController.getAllPeople); // Requires authentication
 router.put(

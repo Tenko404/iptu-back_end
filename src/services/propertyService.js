@@ -1,6 +1,7 @@
-import pool from "../config/db.js"; // Import the connection pool!
+import pool from "../config/db.js";
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
+import * as PeopleModel from "../models/person.js";
 
 // --- Helper Function: findOrCreatePerson (WITH proper error handling) ---
 async function findOrCreatePerson(personData, connection) {
@@ -198,26 +199,29 @@ async function createProperty(propertyData) {
 }
 
 async function getPropertyById(propertyId) {
-  const property = await PropertyModel.getPropertyById(propertyId);
-  if (!property) {
-    console.log("Error message being thrown:", "Propriedade não encontrada."); // ADD THIS LINE
-    throw new Error("Propriedade não encontrada.");
+  try {
+    const property = await PropertyModel.getPropertyById(propertyId);
+
+    if (!property) {
+      // Throw a consistent error if not found
+      throw new Error("Propriedade não encontrada");
+    }
+
+    const people = await PropertyModel.getPeopleByPropertyId(propertyId);
+    const owners = people.filter((p) => p.relationship_type === "owner");
+    const possessor = people.find((p) => p.relationship_type === "possessor");
+    const executor = people.find((p) => p.relationship_type === "executor");
+
+    return {
+      ...property,
+      owners,
+      possessor,
+      executor,
+    };
+  } catch (error) {
+    console.error("Error in getPropertyById service:", error); // Log the error
+    throw error; // Re-throw the error
   }
-
-  // Use the new getPeopleByPropertyId function
-  const people = await PropertyModel.getPeopleByPropertyId(propertyId);
-
-  // Separate owners, possessor, and executor
-  const owners = people.filter((p) => p.relationship_type === "owner");
-  const possessor = people.find((p) => p.relationship_type === "possessor"); // Use find, as there should only be one
-  const executor = people.find((p) => p.relationship_type === "executor");
-
-  return {
-    ...property,
-    owners,
-    possessor,
-    executor,
-  };
 }
 
 async function getAllProperties() {
@@ -234,7 +238,7 @@ async function getAllProperties() {
   return propertiesWithPeople;
 }
 
-// --- updateProperty (Refactored - Uses findOrCreatePerson) ---
+// --- updateProperty ---
 async function updateProperty(propertyId, propertyData) {
   const connection = await pool.getConnection();
   console.log("10. Inside updateProperty service, propertyId:", propertyId);
@@ -252,16 +256,15 @@ async function updateProperty(propertyId, propertyData) {
     // --- 1. Retrieve Existing Property Data ---
     const existingProperty = await PropertyModel.getPropertyById(propertyId);
     if (!existingProperty) {
-      //This error should never happen, but...
       throw new Error("Propriedade não encontrada."); // This error should be handled by the caller
     }
 
-    console.log("Existing Property:", existingProperty); // ADD THIS
+    console.log("Existing Property:", existingProperty);
     const mergedPropertyData = {
       ...existingProperty,
       ...otherPropertyData,
     };
-    console.log("Merged Property Data:", mergedPropertyData); // ADD THIS
+    console.log("Merged Property Data:", mergedPropertyData);
 
     // Use the helper function for owner, possessor, and executor
     const ownerId = await findOrCreatePerson(owner, connection);
@@ -327,7 +330,7 @@ async function updateProperty(propertyId, propertyData) {
     console.log("14. Transaction committed.");
     return {
       id: propertyId,
-      ...mergedPropertyData, // MODIFIED
+      ...mergedPropertyData,
       owner: ownerId ? { id: ownerId, ...owner } : null,
       possessor: possessorId ? { id: possessorId, ...possessor } : null,
       executor: executorId ? { id: executorId, ...executor } : null,
@@ -343,7 +346,7 @@ async function updateProperty(propertyId, propertyData) {
 }
 
 async function deleteProperty(propertyId) {
-  const connection = await pool.getConnection(); // Get connection
+  const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const propertyExists = await PropertyModel.getPropertyById(propertyId);

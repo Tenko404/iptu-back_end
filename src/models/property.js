@@ -72,8 +72,6 @@ async function getAllProperties() {
 // property.js
 async function updateProperty(id, propertyData, connection) {
   try {
-    // NO DESTRUCTURING of propertyData here
-
     const [result] = await connection.query(
       `UPDATE properties SET
           street = ?,

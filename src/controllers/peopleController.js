@@ -34,6 +34,7 @@ export const getPersonById = async (req, res) => {
     const person = await PeopleService.getPersonById(personId);
 
     if (!person) {
+      // This check *was* already here, and it's correct!
       return res.status(404).json({ message: "Pessoa não encontrada." });
     }
 
@@ -73,11 +74,9 @@ export const updatePerson = async (req, res) => {
   } catch (error) {
     console.error("Error in updatePerson controller:", error);
     if (error.code === "ER_DUP_ENTRY") {
-      res
-        .status(409)
-        .json({
-          message: "Já existe uma pessoa cadastrada com este documento.",
-        });
+      res.status(409).json({
+        message: "Já existe uma pessoa cadastrada com este documento.",
+      });
     } else if (error.message === "Person not found") {
       res.status(404).json({ message: error.message });
     } else {
