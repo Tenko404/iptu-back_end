@@ -35,10 +35,7 @@ async function checkPerson(id) {
 // Get a person by ID
 async function getPersonById(personId) {
   const person = await PersonModel.getPersonById(personId);
-  if (!person) {
-    throw new Error("Person not found"); // Throw error to be handled in controller
-  }
-  return person;
+  return person; // Return undefined if not found, don't throw
 }
 
 async function getAllPeople() {
