@@ -67,43 +67,39 @@ async function getAllProperties() {
   }
 }
 
-// property.js
-
-// property.js
 async function updateProperty(id, propertyData, connection) {
-  try {
-    const [result] = await connection.query(
-      `UPDATE properties SET
-          street = ?,
-          house_number = ?,
-          neighborhood = ?,
-          complement = ?,
-          property_registration = ?,
-          tax_type = ?,
-          land_area = ?,
-          built_area = ?,
-          front_photo = ?,
-          above_photo = ?
-      WHERE id = ?`,
-      [
-        propertyData.street,
-        propertyData.house_number,
-        propertyData.neighborhood,
-        propertyData.complement,
-        propertyData.property_registration,
-        propertyData.tax_type,
-        propertyData.land_area,
-        propertyData.built_area,
-        propertyData.front_photo,
-        propertyData.above_photo,
-        id, // The ID for the WHERE clause
-      ]
-    );
+  const db = connection || pool;
+  // Filter out undefined values explicitly
+  const validData = Object.fromEntries(
+    Object.entries(propertyData).filter(([_, value]) => value !== undefined)
+  );
 
+  const fields = Object.keys(validData);
+
+  if (fields.length === 0) {
+    // console.log("No fields provided to update property.");
+    return { affectedRows: 0 }; // No update occurred
+  }
+
+  // Dynamically build the SET clause
+  const setClause = fields.map((field) => `${field} = ?`).join(", ");
+
+  // Get the corresponding values
+  const values = fields.map((field) => validData[field]);
+
+  // Add the property ID for the WHERE clause
+  values.push(id);
+
+  const sql = `UPDATE properties SET ${setClause} WHERE id = ?`;
+
+  try {
+    const [result] = await db.query(sql, values);
+    // Return result; service layer checks affectedRows
     return result;
   } catch (error) {
-    console.error("Error in updateProperty: ", error);
-    throw error;
+    console.error("Error in updateProperty model:", error);
+    // Handle specific errors if needed (like ER_DUP_ENTRY for property_registration)
+    throw error; // Re-throw for the service layer
   }
 }
 
@@ -188,6 +184,51 @@ async function propertyExists(propertyId) {
   }
 }
 
+async function getPropertiesByPersonId(personId, connection) {
+  try {
+    const [rows] = await connection.query(
+      `SELECT p.*
+      FROM properties p
+      INNER JOIN property_people pp ON p.id = pp.property_id
+      WHERE pp.person_id = ?`,
+      [personId]
+    );
+    return rows;
+  } catch (error) {
+    console.error("Error in getPropertiesByPersonId:", error);
+    throw error;
+  }
+}
+
+async function getPeopleForPropertyIds(propertyIds) {
+  // Handle empty list to avoid invalid SQL
+  if (!propertyIds || propertyIds.length === 0) {
+    return [];
+  }
+
+  // Create placeholders for the IN clause (?, ?, ?, ...)
+  const placeholders = propertyIds.map(() => "?").join(",");
+  const sql = `
+    SELECT
+      p.id, p.name, p.document, p.document_type, p.email, p.phone_number,  /* Select needed people fields */
+      pp.property_id,  /* Crucial: Include the property_id to map back */
+      pp.relationship_type,
+      pp.description
+    FROM people p
+    INNER JOIN property_people pp ON p.id = pp.person_id
+    WHERE pp.property_id IN (${placeholders})
+    ORDER BY pp.property_id; /* Optional: ordering might help mapping */
+  `;
+
+  try {
+    const [rows] = await pool.query(sql, propertyIds); // Pass the array of IDs
+    return rows;
+  } catch (error) {
+    console.error("Error in getPeopleForPropertyIds:", error);
+    throw error;
+  }
+}
+
 export {
   createProperty,
   getPropertyById,
@@ -198,4 +239,6 @@ export {
   getPeopleByPropertyId,
   removePropertyPeople,
   propertyExists,
+  getPropertiesByPersonId,
+  getPeopleForPropertyIds,
 };
