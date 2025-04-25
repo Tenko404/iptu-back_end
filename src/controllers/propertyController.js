@@ -2,8 +2,16 @@ import * as PropertyService from "../services/propertyService.js";
 import * as PropertyModel from "../models/property.js"; // Import PropertyModel
 import { validationResult } from "express-validator";
 import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // Import validation functions
+import { unflatten } from "flat";
 
 export const createProperty = async (req, res) => {
+  console.log("--- Inside createProperty Controller ---");
+  console.log("Raw req.body received:", JSON.stringify(req.body, null, 2));
+  console.log("req.files:", req.files);
+
+  const unflattenedBody = unflatten(req.body || {});
+  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2)); // <-- Log the result of unflattening
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -11,37 +19,37 @@ export const createProperty = async (req, res) => {
     }
 
     // --- CPF/CNPJ Validation (Moved to Controller) ---
-    if (req.body.owner?.document_type === "CPF") {
-      if (!isValidCPF(req.body.owner.document)) {
+    if (unflattenedBody.owner?.document_type === "CPF") {
+      if (!isValidCPF(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CPF" });
       }
-    } else if (req.body.owner?.document_type === "CNPJ") {
-      if (!isValidCNPJ(req.body.owner.document)) {
+    } else if (unflattenedBody.owner?.document_type === "CNPJ") {
+      if (!isValidCNPJ(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CNPJ" });
       }
     }
 
     // --- Conditional Validation for Possessor/Executor
-    if (req.body.possessor) {
-      if (req.body.possessor.document_type === "CPF") {
-        if (!isValidCPF(req.body.possessor.document)) {
-          return res.status(400).json({ message: "Invalid CPF" });
+    if (unflattenedBody.possessor) {
+      if (unflattenedBody.possessor.document_type === "CPF") {
+        if (!isValidCPF(unflattenedBody.possessor.document)) {
+          return res.status(400).json({ message: "Invalid Possessor CPF" });
         }
-      } else if (req.body.possessor.document_type === "CNPJ") {
-        if (!isValidCNPJ(req.body.possessor.document)) {
-          return res.status(400).json({ message: "Invalid CNPJ" });
+      } else if (unflattenedBody.possessor.document_type === "CNPJ") {
+        if (!isValidCNPJ(unflattenedBody.possessor.document)) {
+          return res.status(400).json({ message: "Invalid Possessor CNPJ" });
         }
       }
     }
 
-    if (req.body.executor) {
-      if (req.body.executor.document_type === "CPF") {
-        if (!isValidCPF(req.body.executor.document)) {
-          return res.status(400).json({ message: "Invalid CPF" });
+    if (unflattenedBody.executor) {
+      if (unflattenedBody.executor.document_type === "CPF") {
+        if (!isValidCPF(unflattenedBody.executor.document)) {
+          return res.status(400).json({ message: "Invalid Executor CPF" });
         }
-      } else if (req.body.executor.document_type === "CNPJ") {
-        if (!isValidCNPJ(req.body.executor.document)) {
-          return res.status(400).json({ message: "Invalid CNPJ" });
+      } else if (unflattenedBody.executor.document_type === "CNPJ") {
+        if (!isValidCNPJ(unflattenedBody.executor.document)) {
+          return res.status(400).json({ message: "Invalid Executor CNPJ" });
         }
       }
     }
@@ -56,10 +64,15 @@ export const createProperty = async (req, res) => {
         : null;
 
     const propertyData = {
-      ...req.body,
+      ...unflattenedBody, // Use the unflattened object
       front_photo: frontPhotoPath,
       above_photo: abovePhotoPath,
     };
+
+    console.log(
+      "Data prepared for service:",
+      JSON.stringify(propertyData, null, 2)
+    );
 
     const newProperty = await PropertyService.createProperty(propertyData);
     res.status(201).json({
@@ -122,13 +135,16 @@ export const getAllProperties = async (req, res) => {
     res.status(500).json({ message: "Erro interno do servidor." });
   }
 };
-// PRESTENSAOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
 export const updateProperty = async (req, res) => {
   console.log("--- updateProperty (Controller) ---");
   console.log("1. req.params:", req.params);
   console.log("2. req.body:", req.body);
   const propertyId = req.params.id;
   console.log("4. propertyId:", propertyId);
+
+  const unflattenedBody = unflatten(req.body || {});
+  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2));
 
   // --- Controller-Side Existence Check (Your Friend's Suggestion) ---
   try {
@@ -162,57 +178,75 @@ export const updateProperty = async (req, res) => {
     }
 
     // --- CPF/CNPJ Validation (Moved to Controller) ---
-    if (req.body.owner?.document_type === "CPF") {
-      console.log("5. Checking CPF:", req.body.owner.document); // ADDED
-      // Use optional chaining here OR MAYBE REMOVE ?????
-      if (!isValidCPF(req.body.owner.document)) {
+    if (unflattenedBody.owner?.document_type === "CPF") {
+      if (!isValidCPF(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CPF" });
       }
-    } else if (req.body.owner?.document_type === "CNPJ") {
-      console.log("6. Checking CNPJ:", req.body.owner.document); // ADDED
-      // Use optional chaining here OR MAYBE REMOVE ?????
-      if (!isValidCNPJ(req.body.owner.document)) {
+    } else if (unflattenedBody.owner?.document_type === "CNPJ") {
+      if (!isValidCNPJ(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CNPJ" });
       }
     }
 
-    // --- Conditional Validation for Possessor/Executor
-    if (req.body.possessor) {
-      if (req.body.possessor.document_type === "CPF") {
-        if (!isValidCPF(req.body.possessor.document)) {
-          return res.status(400).json({ message: "Invalid CPF" });
+    // --- Conditional Validation for Possessor/Executor (USING unflattenedBody) ---
+    // Check Possessor
+    if (unflattenedBody.possessor) {
+      if (unflattenedBody.possessor.document_type === "CPF") {
+        if (!isValidCPF(unflattenedBody.possessor.document)) {
+          return res.status(400).json({ message: "Invalid Possessor CPF" }); // Added Possessor specificity
         }
-      } else if (req.body.possessor.document_type === "CNPJ") {
-        if (!isValidCNPJ(req.body.possessor.document)) {
-          return res.status(400).json({ message: "Invalid CNPJ" });
+      } else if (unflattenedBody.possessor.document_type === "CNPJ") {
+        if (!isValidCNPJ(unflattenedBody.possessor.document)) {
+          return res.status(400).json({ message: "Invalid Possessor CNPJ" }); // Added Possessor specificity
         }
       }
     }
 
-    if (req.body.executor) {
-      if (req.body.executor.document_type === "CPF") {
-        if (!isValidCPF(req.body.executor.document)) {
-          return res.status(400).json({ message: "Invalid CPF" });
+    // Check Executor
+    if (unflattenedBody.executor) {
+      if (unflattenedBody.executor.document_type === "CPF") {
+        if (!isValidCPF(unflattenedBody.executor.document)) {
+          return res.status(400).json({ message: "Invalid Executor CPF" });
         }
-      } else if (req.body.executor.document_type === "CNPJ") {
-        if (!isValidCNPJ(req.body.executor.document)) {
-          return res.status(400).json({ message: "Invalid CNPJ" });
+      } else if (unflattenedBody.executor.document_type === "CNPJ") {
+        if (!isValidCNPJ(unflattenedBody.executor.document)) {
+          return res.status(400).json({ message: "Invalid Executor CNPJ" });
         }
       }
     }
-    const frontPhotoPath = req.files?.["front_photo"]
-      ? `/uploads/${req.files["front_photo"][0].filename}`
-      : null;
-    const abovePhotoPath = req.files?.["above_photo"]
-      ? `/uploads/${req.files["above_photo"][0].filename}`
-      : null;
+
+    let frontPhotoPath = undefined; // Default to undefined (don't update)
+    if (req.files?.["front_photo"]) {
+      frontPhotoPath = `/uploads/${req.files["front_photo"][0].filename}`;
+    } else if (
+      req.body.front_photo === null ||
+      req.body.front_photo === "null"
+    ) {
+      // Check for explicit null from form field
+      frontPhotoPath = null; // Signal to clear the field
+    }
+
+    let abovePhotoPath = undefined; // Default to undefined (don't update)
+    if (req.files?.["above_photo"]) {
+      abovePhotoPath = `/uploads/${req.files["above_photo"][0].filename}`;
+    } else if (
+      req.body.above_photo === null ||
+      req.body.above_photo === "null"
+    ) {
+      // Check for explicit null
+      abovePhotoPath = null;
+    }
 
     const propertyData = {
-      ...req.body,
-      front_photo: frontPhotoPath,
-      above_photo: abovePhotoPath,
+      ...unflattenedBody, // Use the unflattened object
+      front_photo: frontPhotoPath, // May be path, null, or undefined
+      above_photo: abovePhotoPath, // May be path, null, or undefined
     };
 
+    console.log(
+      "Data prepared for service (UPDATE):",
+      JSON.stringify(propertyData, null, 2)
+    );
     console.log(
       "7. Calling PropertyService.updateProperty with propertyData:",
       propertyData

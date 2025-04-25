@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer"; // For file uploads
-import { unflatten } from "flat"; // Import unflatten
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,12 +25,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Add middleware to unflatten the request body
-app.use((req, res, next) => {
-  if (req.body) {
-    req.body = unflatten(req.body);
-  }
-  next();
-});
+//app.use((req, res, next) => {
+//  if (req.body) {
+//    req.body = unflatten(req.body);
+//  }
+//  next();
+//});
 
 // --- Routes ---
 app.use(routes);
@@ -43,12 +42,18 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 app.use((err, req, res, next) => {
   console.error(err); // Log the error
 
+  // Check for specific known errors first
   if (err instanceof multer.MulterError) {
-    // Handle multer errors (e.g., file too large, invalid file type)
-    res.status(400).json({ message: err.message });
+    // Handle standard Multer errors (LIMIT_FILE_SIZE, etc.)
+    return res.status(400).json({ message: `Multer error: ${err.message}` });
+  } else if (err.message === "Only JPG, JPEG, and PNG files are allowed") {
+    // Handle the specific file type error from our fileFilter
+    return res.status(400).json({ message: err.message });
   } else {
-    // Handle other errors (including errors thrown from controllers/services)
-    res.status(500).json({ message: "Ocorreu um erro no servidor." });
+    // In development, you might want more detail: console.error(err.stack);
+    return res
+      .status(500)
+      .json({ message: "Ocorreu um erro interno no servidor." });
   }
 });
 

@@ -1,9 +1,7 @@
 import pool from "../config/db.js";
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
-import * as PeopleModel from "../models/person.js";
 
-// --- Helper Function: findOrCreatePerson (WITH proper error handling) ---
 async function findOrCreatePerson(personData, connection) {
   if (!personData) {
     return null;
@@ -71,81 +69,18 @@ async function createProperty(propertyData) {
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
     // --- 1. Create Owner (Always Required) ---
-    const existingOwner = await PersonModel.getPersonByDocument(
-      owner.document_type,
-      owner.document
-    );
-    if (existingOwner) {
-      throw new Error("Já existe uma pessoa cadastrada com este documento.");
-    }
-    const newOwner = await PersonModel.createPerson(
-      owner.name,
-      owner.document_type,
-      owner.document,
-      owner.email,
-      owner.phone_number
-    );
-    const ownerId = newOwner.id;
+    const ownerId = await findOrCreatePerson(owner, connection); // REFACTORED
 
     // --- 2. Create Possessor (Optional) ---
     let possessorId = null;
     if (possessor) {
-      if (
-        !possessor.name ||
-        !possessor.email ||
-        !possessor.phone_number ||
-        !possessor.document_type ||
-        !possessor.document ||
-        !possessor.relationship_type
-      ) {
-        throw new Error("Possessor data is incomplete.");
-      }
-      const existingPossessor = await PersonModel.getPersonByDocument(
-        possessor.document_type,
-        possessor.document
-      );
-      if (existingPossessor) {
-        throw new Error("Já existe uma pessoa cadastrada com este documento.");
-      }
-
-      const newPossessor = await PersonModel.createPerson(
-        possessor.name,
-        possessor.document_type,
-        possessor.document,
-        possessor.email,
-        possessor.phone_number
-      );
-      possessorId = newPossessor.id;
+      possessorId = await findOrCreatePerson(possessor, connection); // REFACTORED
     }
 
     // --- 3. Create Executor (Optional) ---
     let executorId = null;
     if (executor) {
-      if (
-        !executor.name ||
-        !executor.email ||
-        !executor.phone_number ||
-        !executor.document_type ||
-        !executor.document ||
-        !executor.relationship_type
-      ) {
-        throw new Error("Executor data is incomplete");
-      }
-      const existingExecutor = await PersonModel.getPersonByDocument(
-        executor.document_type,
-        executor.document
-      );
-      if (existingExecutor) {
-        throw new Error("Já existe uma pessoa cadastrada com este documento.");
-      }
-      const newExecutor = await PersonModel.createPerson(
-        executor.name,
-        executor.document_type,
-        executor.document,
-        executor.email,
-        executor.phone_number
-      );
-      executorId = newExecutor.id;
+      executorId = await findOrCreatePerson(executor, connection); // REFACTORED
     }
 
     // --- 4. Create the Property ---
@@ -225,86 +160,165 @@ async function getPropertyById(propertyId) {
 }
 
 async function getAllProperties() {
+  // 1. Fetch all base properties (Query 1)
   const properties = await PropertyModel.getAllProperties();
 
-  // Use getPeopleByPropertyId to efficiently fetch all related people for each property
-  const propertiesWithPeople = [];
-  for (let property of properties) {
-    const people = await PropertyModel.getPeopleByPropertyId(property.id);
-    const owners = people.filter((p) => p.relationship_type === "owner");
-    //removed possessor and executor since it is pratically never used.
-    propertiesWithPeople.push({ ...property, owners });
+  if (!properties || properties.length === 0) {
+    return []; // Return early if no properties exist
   }
+
+  // 2. Extract all property IDs
+  const propertyIds = properties.map((p) => p.id);
+
+  // 3. Fetch all related people for these properties in one go (Query 2)
+  const allRelatedPeople = await PropertyModel.getPeopleForPropertyIds(
+    propertyIds
+  );
+
+  // 4. Map people to their respective properties efficiently
+  const peopleMap = new Map(); // Use a Map for quick lookups: propertyId -> { owners: [], possessor: null, executor: null }
+  allRelatedPeople.forEach((person) => {
+    const propId = person.property_id;
+    // Ensure an entry exists for this property ID in the map
+    if (!peopleMap.has(propId)) {
+      peopleMap.set(propId, { owners: [], possessor: null, executor: null });
+    }
+
+    const relatedPeople = peopleMap.get(propId);
+
+    // Structure the person object (select only needed fields if desired)
+    const personDetails = {
+      id: person.id,
+      name: person.name,
+      document: person.document,
+      document_type: person.document_type,
+      // Add email/phone if needed by the list view, otherwise omit for less data transfer
+      // email: person.email,
+      // phone_number: person.phone_number,
+      relationship_type: person.relationship_type,
+      description: person.description,
+    };
+
+    // Add the person to the correct category (owner, possessor, executor)
+    switch (person.relationship_type) {
+      case "owner":
+        relatedPeople.owners.push(personDetails);
+        break;
+      case "possessor":
+        relatedPeople.possessor = personDetails; // Assuming only one possessor
+        break;
+      case "executor":
+        relatedPeople.executor = personDetails; // Assuming only one executor
+        break;
+    }
+  });
+
+  // 5. Combine property data with the mapped people data
+  const propertiesWithPeople = properties.map((property) => {
+    const related = peopleMap.get(property.id) || {
+      owners: [],
+      possessor: null,
+      executor: null,
+    }; // Default if somehow no people found
+
+    return {
+      ...property,
+      owners: related.owners,
+    };
+  });
+
   return propertiesWithPeople;
 }
 
 // --- updateProperty ---
 async function updateProperty(propertyId, propertyData) {
   const connection = await pool.getConnection();
-  console.log("10. Inside updateProperty service, propertyId:", propertyId);
-  console.log("11. Inside updateProperty service, propertyData:", propertyData);
+  console.log("updateProperty service START, propertyId:", propertyId); // DEBUG
 
   try {
     await connection.beginTransaction();
 
+    // 1. Check if Property Exists (Service layer responsibility)
+    const existingProperty = await PropertyModel.getPropertyById(propertyId); // Use pool or connection? Pool is fine for read check before transaction logic.
+    if (!existingProperty) {
+      throw new Error("Propriedade não encontrada.");
+    }
+    console.log("Property exists:", existingProperty.id); // DEBUG
+
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
-    console.log(
-      "13. Proceeding with update (Controller already checked existence)."
-    );
-
-    // --- 1. Retrieve Existing Property Data ---
-    const existingProperty = await PropertyModel.getPropertyById(propertyId);
-    if (!existingProperty) {
-      throw new Error("Propriedade não encontrada."); // This error should be handled by the caller
-    }
-
-    console.log("Existing Property:", existingProperty);
-    const mergedPropertyData = {
-      ...existingProperty,
-      ...otherPropertyData,
-    };
-    console.log("Merged Property Data:", mergedPropertyData);
-
-    // Use the helper function for owner, possessor, and executor
+    // 2. Handle People (Find/Create/Update) using the helper
+    // Ensure findOrCreatePerson internally uses the updated PersonModel.updatePerson
     const ownerId = await findOrCreatePerson(owner, connection);
-    const possessorId = await findOrCreatePerson(possessor, connection);
-    const executorId = await findOrCreatePerson(executor, connection);
+    const possessorId = possessor
+      ? await findOrCreatePerson(possessor, connection)
+      : null; // Handle null/undefined possessor input
+    const executorId = executor
+      ? await findOrCreatePerson(executor, connection)
+      : null; // Handle null/undefined executor input
 
-    // --- 3. Update Property Details (using MERGED data) ---
-    await PropertyModel.updateProperty(
-      propertyId,
-      mergedPropertyData, // Update with MERGED data
-      connection
+    console.log("People IDs:", { ownerId, possessorId, executorId }); // DEBUG
+
+    // 3. Prepare Property Data for Update
+    const dataToUpdate = { ...otherPropertyData };
+
+    // Handle file paths explicitly:
+    // If a photo field is MISSING (undefined) in propertyData, it won't be in dataToUpdate, preserving DB value.
+    // If a photo field is EXPLICITLY NULL in propertyData, set it to NULL in DB.
+    if (propertyData.front_photo === null) {
+      dataToUpdate.front_photo = null;
+    }
+    if (propertyData.above_photo === null) {
+      dataToUpdate.above_photo = null;
+    }
+    // If photo fields are present with paths (from multer), they are already in dataToUpdate.
+
+    // Filter out any remaining undefined values before sending to model
+    const finalPropertyUpdateData = Object.fromEntries(
+      Object.entries(dataToUpdate).filter(([_, value]) => value !== undefined)
     );
 
-    // Update Property Details
-    const filteredUpdateData = Object.fromEntries(
-      Object.entries(otherPropertyData).filter(
-        ([key, value]) => value !== undefined
-      )
-    );
+    console.log("Final property data for update:", finalPropertyUpdateData); // DEBUG
 
-    if (Object.keys(filteredUpdateData).length > 0) {
-      await PropertyModel.updateProperty(
+    // 4. Update Property Details (SINGLE CALL to the updated model)
+    if (Object.keys(finalPropertyUpdateData).length > 0) {
+      const result = await PropertyModel.updateProperty(
         propertyId,
-        filteredUpdateData,
+        finalPropertyUpdateData,
         connection
       );
+      if (result.affectedRows === 0) {
+        console.warn(
+          `Property update affected 0 rows for ID: ${propertyId}. Data might be identical.`
+        );
+        // No need to throw error, maybe data was the same
+      }
+      console.log("Property details updated."); // DEBUG
+    } else {
+      console.log("No property fields to update."); // DEBUG
     }
 
-    // Update relationships (Remove and Re-add)
+    // 5. Update Relationships (Remove all and Re-add)
+    console.log("Updating relationships..."); // DEBUG
     await PropertyModel.removePropertyPeople(propertyId, connection);
 
-    // Always link the owner
+    // Always link the owner (assuming owner is mandatory)
     if (ownerId) {
+      // Should always have an ownerId from findOrCreatePerson
       await PropertyModel.linkPropertyToPerson(
         propertyId,
         ownerId,
         "owner",
-        null,
+        owner?.description, // Get description from original input if exists
         connection
       );
+    } else {
+      // This case should ideally not happen if owner is mandatory for a property
+      console.error(
+        "Owner ID was not determined during update for property:",
+        propertyId
+      );
+      throw new Error("Falha ao determinar proprietário para atualização.");
     }
 
     if (possessorId) {
@@ -325,23 +339,23 @@ async function updateProperty(propertyId, propertyData) {
         connection
       );
     }
+    console.log("Relationships updated."); // DEBUG
 
     await connection.commit();
-    console.log("14. Transaction committed.");
-    return {
-      id: propertyId,
-      ...mergedPropertyData,
-      owner: ownerId ? { id: ownerId, ...owner } : null,
-      possessor: possessorId ? { id: possessorId, ...possessor } : null,
-      executor: executorId ? { id: executorId, ...executor } : null,
-    };
+    console.log("Transaction committed."); // DEBUG
+
+    // 6. Fetch and return the fully updated property representation
+    // Call the existing service function to get the structured response
+    const updatedProperty = await getPropertyById(propertyId); // Use the service function to get nested data
+    return updatedProperty;
   } catch (error) {
     await connection.rollback();
     console.error("Transaction rolled back (UPDATE):", error);
+    // Add more specific logging if needed
     throw error; // Re-throw to be handled by the controller
   } finally {
     connection.release();
-    console.log("16. Connection released");
+    console.log("Connection released."); // DEBUG
   }
 }
 
@@ -349,26 +363,61 @@ async function deleteProperty(propertyId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+
+    // 1. Retrieve associated people BEFORE deleting the property
+    const people = await PropertyModel.getPeopleByPropertyId(propertyId);
+    const owner = people.find((p) => p.relationship_type === "owner");
+    const possessor = people.find((p) => p.relationship_type === "possessor");
+    const executor = people.find((p) => p.relationship_type === "executor");
+
+    //Check property existence
     const propertyExists = await PropertyModel.getPropertyById(propertyId);
     if (!propertyExists) {
       throw new Error("Property not found");
     }
+
+    // 2. Delete the property and its links (existing logic)
     await PropertyModel.removePropertyPeople(propertyId, connection);
     await PropertyModel.deleteProperty(propertyId, connection);
+
+    // 3. & 4. Check for remaining associations and delete people if necessary
+    async function checkAndDeletePerson(person) {
+      if (person) {
+        const remainingAssociations =
+          await PropertyModel.getPropertiesByPersonId(person.id, connection);
+        if (remainingAssociations.length === 0) {
+          await PeopleModel.deletePerson(person.id, connection); // Delete the person
+        }
+      }
+    }
+
+    await checkAndDeletePerson(owner);
+    await checkAndDeletePerson(possessor);
+    await checkAndDeletePerson(executor);
+
     await connection.commit();
     return;
   } catch (error) {
     await connection.rollback();
+    console.error("Transaction rolled back (DELETE):", error);
     throw error;
   } finally {
     connection.release();
   }
 }
 
+async function getPropertiesByPersonId(personId, connection) {
+  const properties = await PropertyModel.getPropertiesByPersonId(
+    personId,
+    connection
+  );
+  return properties;
+}
 export {
   createProperty,
   getPropertyById,
   getAllProperties,
   updateProperty,
   deleteProperty,
+  getPropertiesByPersonId,
 };
