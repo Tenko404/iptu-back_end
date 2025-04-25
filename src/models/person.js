@@ -71,23 +71,45 @@ async function getAllPeople(connection) {
 }
 
 async function updatePerson(id, personData, connection) {
-  // Add connection
   const db = connection || pool;
+  // Filter out undefined values explicitly, although the dynamic query builder handles missing keys
+  const validData = Object.fromEntries(
+    Object.entries(personData).filter(([_, value]) => value !== undefined)
+  );
+
+  // Get the keys provided in the personData object
+  const fields = Object.keys(validData);
+
+  // If no fields are provided to update, return early (or handle as needed)
+  if (fields.length === 0) {
+    // console.log("No fields provided to update person.");
+    return { affectedRows: 0 }; // Or throw an error if update must change something
+  }
+
+  // Dynamically build the SET part of the query
+  // Example: SET name = ?, email = ?, phone_number = ?
+  const setClause = fields.map((field) => `${field} = ?`).join(", ");
+
+  // Get the corresponding values in the correct order
+  const values = fields.map((field) => validData[field]);
+
+  // Add the person's ID to the end of the values array for the WHERE clause
+  values.push(id);
+
+  const sql = `UPDATE people SET ${setClause} WHERE id = ?`;
+
   try {
-    const { name, email, phone_number, document_type, document } = personData;
-    const [result] = await db.query(
-      // Use 'db' instead of 'pool'
-      `UPDATE people
-      SET name = ?, email = ?, phone_number = ?, document_type = ?, document = ?
-      WHERE id = ?`,
-      [name, email, phone_number, document_type, document, id]
-    );
+    const [result] = await db.query(sql, values);
+    // Return the result object which includes affectedRows
+    // The service layer can check result.affectedRows > 0 to confirm update
     return result;
   } catch (error) {
-    console.error("Error in updatePerson:", error);
-    throw error;
+    console.error("Error in updatePerson model:", error);
+    // Handle specific errors if needed (like ER_DUP_ENTRY for document)
+    throw error; // Re-throw for the service layer
   }
 }
+
 async function deletePerson(id, connection) {
   // Add connection
   const db = connection || pool;
