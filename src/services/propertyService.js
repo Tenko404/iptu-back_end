@@ -7,14 +7,30 @@ async function findOrCreatePerson(personData, connection) {
     return null;
   }
 
-  const { name, email, phone_number, document_type, document } = personData;
+  const { name, email, phone_number, document_type, document, ...otherData } =
+    personData;
 
   if (!document_type || !document) {
-    throw new Error("Document type and document are required for person.");
+    if (name || email || phone_number) {
+      console.warn(
+        "findOrCreatePerson called with person details but no document/type."
+      );
+      throw new Error(
+        "Document type and document are required to find or create a person by document."
+      );
+    } else {
+      console.log(
+        "findOrCreatePerson called with insufficient data, returning null."
+      );
+      return null;
+    }
   }
 
   try {
-    // 1. Try to find existing person - USE THE CONNECTION
+    // 1. Try to find existing person by document using the transaction connection
+    console.log(
+      `Searching for person with document: ${document_type} - ${document}`
+    ); // DEBUG
     let existingPerson = await PersonModel.getPersonByDocument(
       document_type,
       document,
@@ -22,29 +38,61 @@ async function findOrCreatePerson(personData, connection) {
     );
 
     if (existingPerson) {
-      // 2. Person exists: Update details (if provided) - USE THE CONNECTION
+      console.log(`Found existing person ID: ${existingPerson.id}`); // DEBUG
+      // 2. Person exists: Update IF name, email, or phone_number are explicitly provided in the input `personData`
       const updateData = {};
-      if (name) updateData.name = name;
-      if (email) updateData.email = email;
-      if (phone_number) updateData.phone_number = phone_number;
-      if (document_type) updateData.document_type = document_type;
-      if (document) updateData.document = document;
+      // Check if field exists and is not undefined in the input object
+      if (personData.hasOwnProperty("name") && name !== undefined)
+        updateData.name = name;
+      if (personData.hasOwnProperty("email") && email !== undefined)
+        updateData.email = email;
+      if (
+        personData.hasOwnProperty("phone_number") &&
+        phone_number !== undefined
+      )
+        updateData.phone_number = phone_number;
 
+      // Only run the update query if there are actual fields passed in the request to update
       if (Object.keys(updateData).length > 0) {
+        console.log(
+          `Updating existing person ${existingPerson.id} with data:`,
+          updateData
+        ); // DEBUG
+        // Use the updated PersonModel.updatePerson which handles partial updates
         await PersonModel.updatePerson(
           existingPerson.id,
           updateData,
           connection // Pass the connection
         );
+      } else {
+        console.log(
+          `Found existing person ${existingPerson.id}, no new details provided to update.`
+        ); // DEBUG
       }
+      // Return the ID of the existing (and potentially updated) person
       return existingPerson.id;
     } else {
-      // 3. Person doesn't exist: Create new person - USE THE CONNECTION
-      if (!name || !email || !phone_number) {
+      console.log(
+        `Person with document ${document} not found. Attempting to create.`
+      ); // DEBUG
+      // 3. Person doesn't exist: Create a new person
+      // Check if all required fields for CREATION are present (name, email, phone are mandatory based on DB/logic)
+      if (
+        name === undefined ||
+        email === undefined ||
+        phone_number === undefined
+      ) {
+        console.error("Missing required fields for creating new person:", {
+          name,
+          email,
+          phone_number,
+        }); // Log missing fields
         throw new Error(
-          "Name, email, and phone number are required to create a new person."
+          "Name, email, and phone number are required to create a new person when document is not found."
         );
       }
+
+      console.log(`Creating new person with document ${document}`); // DEBUG
       const newPerson = await PersonModel.createPerson(
         name,
         document_type,
@@ -53,10 +101,16 @@ async function findOrCreatePerson(personData, connection) {
         phone_number,
         connection // Pass the connection
       );
+      console.log(`Created new person with ID: ${newPerson.id}`); // DEBUG
       return newPerson.id;
     }
   } catch (error) {
-    console.error("Error in findOrCreatePerson:", error);
+    // Log the specific error origin for better debugging
+    console.error(
+      `Error during findOrCreatePerson for document ${document_type} / ${document}:`,
+      error
+    );
+    // Avoid re-throwing generic error, let specific DB/validation errors propagate if possible
     throw error;
   }
 }
@@ -233,7 +287,10 @@ async function getAllProperties() {
 // --- updateProperty ---
 async function updateProperty(propertyId, propertyData) {
   const connection = await pool.getConnection();
-  console.log("updateProperty service START, propertyId:", propertyId); // DEBUG
+  console.log(
+    "updateProperty service START (using findOrCreatePerson), propertyId:",
+    propertyId
+  );
 
   try {
     await connection.beginTransaction();
@@ -247,115 +304,174 @@ async function updateProperty(propertyId, propertyData) {
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
-    // 2. Handle People (Find/Create/Update) using the helper
-    // Ensure findOrCreatePerson internally uses the updated PersonModel.updatePerson
-    const ownerId = await findOrCreatePerson(owner, connection);
-    const possessorId = possessor
-      ? await findOrCreatePerson(possessor, connection)
-      : null; // Handle null/undefined possessor input
-    const executorId = executor
-      ? await findOrCreatePerson(executor, connection)
-      : null; // Handle null/undefined executor input
+    // 2. Determine Target Person IDs using findOrCreatePerson
+    let targetOwnerId = null;
+    let targetPossessorId = null;
+    let targetExecutorId = null;
+    let ownerDescription = null; // Store descriptions separately
+    let possessorDescription = possessor?.description;
+    let executorDescription = executor?.description;
 
-    console.log("People IDs:", { ownerId, possessorId, executorId }); // DEBUG
+    // --- Handle Owner ---
+    if (propertyData.hasOwnProperty("owner")) {
+      // Check if owner key was present in request
+      if (owner === null) {
+        // Attempting to remove owner - disallow?
+        console.error("Attempt to remove owner during update is not allowed.");
+        throw new Error("Property must have an owner.");
+      } else {
+        // Find or Create the owner provided in the request
+        targetOwnerId = await findOrCreatePerson(owner, connection);
+        ownerDescription = owner?.description; // Though owners usually don't have descriptions
+        if (!targetOwnerId) {
+          // findOrCreatePerson should throw if creation fails
+          throw new Error("Failed to process owner information.");
+        }
+      }
+    } else {
+      // Owner key was NOT in request body - keep the existing owner
+      const currentOwner = (
+        await PropertyModel.getPeopleByPropertyId(propertyId)
+      ).find((p) => p.relationship_type === "owner");
+      targetOwnerId = currentOwner?.id; // Use existing ID
+      if (!targetOwnerId) {
+        console.error(
+          `Consistency Error: Property ${propertyId} has no current owner.`
+        );
+        throw new Error("Failed to find current owner for property.");
+      }
+      console.log(`Keeping existing owner ID: ${targetOwnerId}`);
+    }
+
+    // --- Handle Possessor ---
+    if (propertyData.hasOwnProperty("possessor")) {
+      // Check if possessor key was present
+      if (possessor === null) {
+        targetPossessorId = null; // Request to remove
+        console.log("Request to remove possessor.");
+      } else {
+        // Find or Create the possessor provided
+        targetPossessorId = await findOrCreatePerson(possessor, connection);
+        if (!targetPossessorId) {
+          // Should not happen if possessor object is valid
+          throw new Error("Failed to process possessor information.");
+        }
+      }
+    } else {
+      // Possessor key was NOT in request body - keep existing (if any)
+      const currentPossessor = (
+        await PropertyModel.getPeopleByPropertyId(propertyId)
+      ).find((p) => p.relationship_type === "possessor");
+      targetPossessorId = currentPossessor?.id; // Use existing ID or null
+      possessorDescription = currentPossessor?.description; // Keep existing description
+      console.log(`Keeping existing possessor ID: ${targetPossessorId}`);
+    }
+
+    // --- Handle Executor ---
+    if (propertyData.hasOwnProperty("executor")) {
+      // Check if executor key was present
+      if (executor === null) {
+        targetExecutorId = null; // Request to remove
+        console.log("Request to remove executor.");
+      } else {
+        // Find or Create the executor provided
+        targetExecutorId = await findOrCreatePerson(executor, connection);
+        if (!targetExecutorId) {
+          // Should not happen if executor object is valid
+          throw new Error("Failed to process executor information.");
+        }
+      }
+    } else {
+      // Executor key was NOT in request body - keep existing (if any)
+      const currentExecutor = (
+        await PropertyModel.getPeopleByPropertyId(propertyId)
+      ).find((p) => p.relationship_type === "executor");
+      targetExecutorId = currentExecutor?.id; // Use existing ID or null
+      executorDescription = currentExecutor?.description; // Keep existing description
+      console.log(`Keeping existing executor ID: ${targetExecutorId}`);
+    }
+
+    console.log("Final Target People IDs:", {
+      targetOwnerId,
+      targetPossessorId,
+      targetExecutorId,
+    });
 
     // 3. Prepare Property Data for Update
     const dataToUpdate = { ...otherPropertyData };
+    if (propertyData.hasOwnProperty("front_photo"))
+      dataToUpdate.front_photo = propertyData.front_photo;
+    if (propertyData.hasOwnProperty("above_photo"))
+      dataToUpdate.above_photo = propertyData.above_photo;
 
-    // Handle file paths explicitly:
-    // If a photo field is MISSING (undefined) in propertyData, it won't be in dataToUpdate, preserving DB value.
-    // If a photo field is EXPLICITLY NULL in propertyData, set it to NULL in DB.
-    if (propertyData.front_photo === null) {
-      dataToUpdate.front_photo = null;
-    }
-    if (propertyData.above_photo === null) {
-      dataToUpdate.above_photo = null;
-    }
-    // If photo fields are present with paths (from multer), they are already in dataToUpdate.
-
-    // Filter out any remaining undefined values before sending to model
     const finalPropertyUpdateData = Object.fromEntries(
-      Object.entries(dataToUpdate).filter(([_, value]) => value !== undefined)
+      Object.entries(dataToUpdate).filter(([key, value]) => value !== undefined)
     );
 
     console.log("Final property data for update:", finalPropertyUpdateData); // DEBUG
 
     // 4. Update Property Details (SINGLE CALL to the updated model)
     if (Object.keys(finalPropertyUpdateData).length > 0) {
-      const result = await PropertyModel.updateProperty(
+      console.log("Updating property fields:", finalPropertyUpdateData);
+      await PropertyModel.updateProperty(
         propertyId,
         finalPropertyUpdateData,
         connection
       );
-      if (result.affectedRows === 0) {
-        console.warn(
-          `Property update affected 0 rows for ID: ${propertyId}. Data might be identical.`
-        );
-        // No need to throw error, maybe data was the same
-      }
-      console.log("Property details updated."); // DEBUG
     } else {
-      console.log("No property fields to update."); // DEBUG
+      console.log("No property fields to update.");
     }
 
     // 5. Update Relationships (Remove all and Re-add)
     console.log("Updating relationships..."); // DEBUG
     await PropertyModel.removePropertyPeople(propertyId, connection);
 
-    // Always link the owner (assuming owner is mandatory)
-    if (ownerId) {
-      // Should always have an ownerId from findOrCreatePerson
-      await PropertyModel.linkPropertyToPerson(
-        propertyId,
-        ownerId,
-        "owner",
-        owner?.description, // Get description from original input if exists
-        connection
-      );
-    } else {
-      // This case should ideally not happen if owner is mandatory for a property
-      console.error(
-        "Owner ID was not determined during update for property:",
-        propertyId
-      );
-      throw new Error("Falha ao determinar proprietário para atualização.");
-    }
+    // Link Target Owner (Must have one)
+    if (!targetOwnerId)
+      throw new Error("Consistency Error: Owner ID is missing before linking."); // Should have been caught earlier
+    await PropertyModel.linkPropertyToPerson(
+      propertyId,
+      targetOwnerId,
+      "owner",
+      ownerDescription,
+      connection
+    );
 
-    if (possessorId) {
+    // Link Target Possessor (if exists)
+    if (targetPossessorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
-        possessorId,
+        targetPossessorId,
         "possessor",
-        possessor?.description,
+        possessorDescription,
         connection
       );
     }
-    if (executorId) {
+    // Link Target Executor (if exists)
+    if (targetExecutorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
-        executorId,
+        targetExecutorId,
         "executor",
-        executor?.description,
+        executorDescription,
         connection
       );
     }
-    console.log("Relationships updated."); // DEBUG
+    console.log("Relationships updated.");
 
     await connection.commit();
-    console.log("Transaction committed."); // DEBUG
+    console.log("Transaction committed.");
 
     // 6. Fetch and return the fully updated property representation
-    // Call the existing service function to get the structured response
-    const updatedProperty = await getPropertyById(propertyId); // Use the service function to get nested data
+    const updatedProperty = await getPropertyById(propertyId);
     return updatedProperty;
   } catch (error) {
     await connection.rollback();
     console.error("Transaction rolled back (UPDATE):", error);
-    // Add more specific logging if needed
-    throw error; // Re-throw to be handled by the controller
+    throw error;
   } finally {
     connection.release();
-    console.log("Connection released."); // DEBUG
+    console.log("Connection released.");
   }
 }
 
