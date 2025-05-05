@@ -502,7 +502,16 @@ async function deleteProperty(propertyId) {
         const remainingAssociations =
           await PropertyModel.getPropertiesByPersonId(person.id, connection);
         if (remainingAssociations.length === 0) {
-          await PeopleModel.deletePerson(person.id, connection); // Delete the person
+          console.log(
+            `Person ${person.id} has no remaining associations. Deleting...`
+          ); // DEBUG
+          // --- FIX IS HERE ---
+          await PersonModel.deletePerson(person.id, connection); // Use PersonModel
+          // --- END FIX ---
+        } else {
+          console.log(
+            `Person ${person.id} still has ${remainingAssociations.length} associations. Not deleting.`
+          ); // DEBUG
         }
       }
     }
@@ -512,13 +521,21 @@ async function deleteProperty(propertyId) {
     await checkAndDeletePerson(executor);
 
     await connection.commit();
-    return;
+    console.log("Transaction committed (DELETE)."); // DEBUG
+    // Return nothing on successful delete
   } catch (error) {
-    await connection.rollback();
-    console.error("Transaction rolled back (DELETE):", error);
-    throw error;
+    // Rollback only if transaction was actually started and error occurred after check
+    if (!error.message.includes("Property not found")) {
+      // Avoid rollback if existence check failed early
+      await connection.rollback();
+      console.error("Transaction rolled back (DELETE):", error);
+    } else {
+      console.error("Error during delete (Property not found):", error.message);
+    }
+    throw error; // Re-throw original error
   } finally {
     connection.release();
+    console.log("Connection released (DELETE)."); // DEBUG
   }
 }
 
