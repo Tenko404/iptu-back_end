@@ -1,7 +1,7 @@
 import * as PropertyService from "../services/propertyService.js";
-import * as PropertyModel from "../models/property.js"; // Import PropertyModel
+import * as PropertyModel from "../models/property.js";
 import { validationResult } from "express-validator";
-import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // Import validation functions
+import { isValidCPF, isValidCNPJ } from "../services/utils.js";
 import { unflatten } from "flat";
 
 export const createProperty = async (req, res) => {
@@ -10,7 +10,7 @@ export const createProperty = async (req, res) => {
   console.log("req.files:", req.files);
 
   const unflattenedBody = unflatten(req.body || {});
-  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2)); // <-- Log the result of unflattening
+  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2)); // Unflattening log
 
   try {
     const errors = validationResult(req);
@@ -18,7 +18,7 @@ export const createProperty = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // --- CPF/CNPJ Validation (Moved to Controller) ---
+    // --- CPF/CNPJ Validation ---
     if (unflattenedBody.owner?.document_type === "CPF") {
       if (!isValidCPF(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CPF" });
@@ -29,7 +29,7 @@ export const createProperty = async (req, res) => {
       }
     }
 
-    // --- Conditional Validation for Possessor/Executor
+    // --- Conditional Validation for Possessor/Executor ---
     if (unflattenedBody.possessor) {
       if (unflattenedBody.possessor.document_type === "CPF") {
         if (!isValidCPF(unflattenedBody.possessor.document)) {
@@ -64,7 +64,7 @@ export const createProperty = async (req, res) => {
         : null;
 
     const propertyData = {
-      ...unflattenedBody, // Use the unflattened object
+      ...unflattenedBody,
       front_photo: frontPhotoPath,
       above_photo: abovePhotoPath,
     };
@@ -78,13 +78,12 @@ export const createProperty = async (req, res) => {
     res.status(201).json({
       message: "Propriedade criada com sucesso!",
       property: newProperty,
-    }); // Return the created property object
+    });
   } catch (error) {
     console.error("Error in createProperty controller:", error);
     let statusCode = 500;
     let message = "Erro interno do servidor.";
 
-    // More specific error handling.
     if (error.message.startsWith("Invalid owner ID")) {
       statusCode = 400;
       message = error.message;
@@ -128,7 +127,7 @@ export const getPropertyById = async (req, res) => {
 
 export const getAllProperties = async (req, res) => {
   try {
-    const properties = await PropertyService.getAllProperties(req.query); // Keep req.query for potential future use (filtering, etc.)
+    const properties = await PropertyService.getAllProperties(req.query);
     res.status(200).json(properties);
   } catch (error) {
     console.error("Erro em getAllProperties controller: ", error);
@@ -146,7 +145,7 @@ export const updateProperty = async (req, res) => {
   const unflattenedBody = unflatten(req.body || {});
   console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2));
 
-  // --- Controller-Side Existence Check (Your Friend's Suggestion) ---
+  // --- Controller-Side Existence Check ---
   try {
     const propertyExists = await PropertyModel.propertyExists(propertyId);
     if (!propertyExists) {
@@ -165,11 +164,11 @@ export const updateProperty = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("3. Validation Errors:", errors.array()); // ADDED
+      console.log("3. Validation Errors:", errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
     const propertyId = req.params.id;
-    console.log("4. propertyId:", propertyId); // ADDED
+    console.log("4. propertyId:", propertyId);
 
     if (Object.keys(req.body).length === 0) {
       return res
@@ -177,7 +176,7 @@ export const updateProperty = async (req, res) => {
         .json({ message: "Request body cannot be empty for a PUT request." });
     }
 
-    // --- CPF/CNPJ Validation (Moved to Controller) ---
+    // --- CPF/CNPJ Validation ---
     if (unflattenedBody.owner?.document_type === "CPF") {
       if (!isValidCPF(unflattenedBody.owner.document)) {
         return res.status(400).json({ message: "Invalid CPF" });
@@ -188,21 +187,20 @@ export const updateProperty = async (req, res) => {
       }
     }
 
-    // --- Conditional Validation for Possessor/Executor (USING unflattenedBody) ---
+    // --- Conditional Validation for Possessor/Executor ---
     // Check Possessor
     if (unflattenedBody.possessor) {
       if (unflattenedBody.possessor.document_type === "CPF") {
         if (!isValidCPF(unflattenedBody.possessor.document)) {
-          return res.status(400).json({ message: "Invalid Possessor CPF" }); // Added Possessor specificity
+          return res.status(400).json({ message: "Invalid Possessor CPF" });
         }
       } else if (unflattenedBody.possessor.document_type === "CNPJ") {
         if (!isValidCNPJ(unflattenedBody.possessor.document)) {
-          return res.status(400).json({ message: "Invalid Possessor CNPJ" }); // Added Possessor specificity
+          return res.status(400).json({ message: "Invalid Possessor CNPJ" });
         }
       }
     }
 
-    // Check Executor
     if (unflattenedBody.executor) {
       if (unflattenedBody.executor.document_type === "CPF") {
         if (!isValidCPF(unflattenedBody.executor.document)) {
@@ -215,32 +213,30 @@ export const updateProperty = async (req, res) => {
       }
     }
 
-    let frontPhotoPath = undefined; // Default to undefined (don't update)
+    let frontPhotoPath = undefined;
     if (req.files?.["front_photo"]) {
       frontPhotoPath = `/uploads/${req.files["front_photo"][0].filename}`;
     } else if (
       req.body.front_photo === null ||
       req.body.front_photo === "null"
     ) {
-      // Check for explicit null from form field
-      frontPhotoPath = null; // Signal to clear the field
+      frontPhotoPath = null;
     }
 
-    let abovePhotoPath = undefined; // Default to undefined (don't update)
+    let abovePhotoPath = undefined;
     if (req.files?.["above_photo"]) {
       abovePhotoPath = `/uploads/${req.files["above_photo"][0].filename}`;
     } else if (
       req.body.above_photo === null ||
       req.body.above_photo === "null"
     ) {
-      // Check for explicit null
       abovePhotoPath = null;
     }
 
     const propertyData = {
-      ...unflattenedBody, // Use the unflattened object
-      front_photo: frontPhotoPath, // May be path, null, or undefined
-      above_photo: abovePhotoPath, // May be path, null, or undefined
+      ...unflattenedBody,
+      front_photo: frontPhotoPath,
+      above_photo: abovePhotoPath,
     };
 
     console.log(
@@ -250,21 +246,21 @@ export const updateProperty = async (req, res) => {
     console.log(
       "7. Calling PropertyService.updateProperty with propertyData:",
       propertyData
-    ); // ADDED
+    );
 
     const updatedProperty = await PropertyService.updateProperty(
       propertyId,
       propertyData
     );
 
-    console.log("8. updateProperty service returned:", updatedProperty); // ADDED
+    console.log("8. updateProperty service returned:", updatedProperty);
 
     res.status(200).json({
       message: "Propriedade atualizada com sucesso!",
       property: updatedProperty,
-    }); // Return the updated object
+    });
   } catch (error) {
-    console.error("9. Error in updateProperty controller:", error); // ADDED ERROR NUMBER
+    console.error("9. Error in updateProperty controller:", error);
     let statusCode = 500;
     let message = "Erro interno do servidor.";
 

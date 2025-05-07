@@ -4,7 +4,7 @@ import { body } from "express-validator";
 const loginRequest = [
   body("employee_id")
     .isInt({ min: 1000000, max: 9999999 })
-    .withMessage("Employee ID must be a 7-digit number") //checks if is a integer and if has 7 digits
+    .withMessage("Employee ID must be a 7-digit number")
     .notEmpty()
     .withMessage("Employee ID is required"),
   body("password")
@@ -17,7 +17,7 @@ const loginRequest = [
     .matches(/[0-9]/)
     .withMessage("Password must contain at least one number")
     .matches(/[^a-zA-Z0-9\s]/)
-    .withMessage("Password must contain at least one special character") //checks for at least one character that is not a letter, number or space
+    .withMessage("Password must contain at least one special character")
     .notEmpty()
     .withMessage("Password is required"),
 ];

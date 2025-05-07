@@ -1,5 +1,5 @@
 import { body, param } from "express-validator";
-import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // Assuming you have utility functions for CPF/CNPJ
+import { isValidCPF, isValidCNPJ } from "../services/utils.js";
 
 const createPersonRequest = [
   body("name")
@@ -35,14 +35,12 @@ const createPersonRequest = [
           throw new Error("Invalid CNPJ");
         }
       }
-      return true; // Important: Return true if validation passes
+      return true;
     }),
 ];
 
 const updatePersonRequest = [
-  param("id") //validate the id in the URL
-    .isInt()
-    .withMessage("Id must be an integer"),
+  param("id").isInt().withMessage("Id must be an integer"),
   body("name")
     .isLength({ max: 150 })
     .withMessage("Name must be less than 150 characters")
@@ -68,7 +66,7 @@ const updatePersonRequest = [
           throw new Error("Invalid CNPJ");
         }
       }
-      return true; // Important: Return true if validation passes
+      return true;
     }),
 ];
 
