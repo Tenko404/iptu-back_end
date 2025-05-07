@@ -1,5 +1,5 @@
 import { body, param } from "express-validator";
-// REMOVED: import { isValidCPF, isValidCNPJ } from "../services/utils.js"; // No longer needed here
+//import { isValidCPF, isValidCNPJ } from "../services/utils.js";
 
 const createPropertyRequest = [
   // --- Property Address ---
@@ -70,10 +70,7 @@ const createPropertyRequest = [
     .withMessage("Owner document type must be CPF or CNPJ")
     .notEmpty()
     .withMessage("Owner document type is required"),
-  body("owner.document")
-    .notEmpty() // Keep this to ensure *something* is provided
-    .withMessage("Owner document is required"),
-  // REMOVED the .custom validator
+  body("owner.document").notEmpty().withMessage("Owner document is required"),
 
   // --- Possessor/Executor Information (Conditional) ---
   body("possessor.name")
@@ -137,7 +134,7 @@ const createPropertyRequest = [
     .withMessage("Executor document type is required"),
   body("executor.document")
     .if(body("executor").exists())
-    .notEmpty() // Keep this
+    .notEmpty()
     .withMessage("Executor document is required"),
   body("executor.relationship_type")
     .if(body("executor").exists())

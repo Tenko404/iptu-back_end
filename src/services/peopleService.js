@@ -12,18 +12,18 @@ async function createPerson(personData) {
     throw new Error("Já existe uma pessoa cadastrada com este documento.");
   }
 
-  // Create the person
+  // Create person
   const newPerson = await PersonModel.createPerson(
     name,
     document_type,
     document,
     email,
     phone_number
-  ); // Pass email/phone
+  );
   return newPerson;
 }
 
-//check the person, used for request validation
+// Check the person for request validation
 async function checkPerson(id) {
   const person = await PersonModel.getPersonById(id);
   if (!person) {
@@ -32,10 +32,10 @@ async function checkPerson(id) {
   return person;
 }
 
-// Get a person by ID
+// Get person by ID
 async function getPersonById(personId) {
   const person = await PersonModel.getPersonById(personId);
-  return person; // Return undefined if not found, don't throw
+  return person;
 }
 
 async function getAllPeople() {
@@ -47,7 +47,6 @@ async function updatePerson(personId, personData) {
   // 1. Check if the person exists
   const personExists = await PersonModel.getPersonById(personId);
   if (!personExists) {
-    // Use a more specific error type if implemented, otherwise keep string
     throw new Error("Person not found");
   }
 
@@ -58,45 +57,34 @@ async function updatePerson(personId, personData) {
       document_type,
       document
     );
-    // Ensure the conflicting document doesn't belong to *another* person
     if (existingPersonWithDoc && existingPersonWithDoc.id != personId) {
-      // Use a specific error type/message for duplicates
       throw new Error("Já existe outra pessoa cadastrada com este documento.");
     }
   }
 
-  // 3. Prepare data for the model (can pass personData directly, or filter nulls if needed)
-  // The updated model handles missing keys, so we can pass personData.
-  // If you want to explicitly prevent setting fields to NULL via undefined, filter here.
-  // For simplicity now, let's assume undefined means "don't update".
+  // 3. Prepare data for the model
   const dataToUpdate = Object.fromEntries(
     Object.entries(personData).filter(([_, value]) => value !== undefined)
   );
 
-  // If no actual data is left to update after filtering, maybe return early?
   if (Object.keys(dataToUpdate).length === 0) {
     console.log("No valid fields provided for person update.");
-    // Return the existing data or indicate no change occurred
     return personExists;
   }
 
   // 4. Call the updated model function
   const result = await PersonModel.updatePerson(personId, dataToUpdate); // Pass connection if in transaction context
 
-  // 5. Optional: Check if update actually occurred
+  // 5. Check if update actually occurred
   if (result.affectedRows === 0) {
-    // This might happen if the data provided was identical to existing data
-    // Or if the ID didn't match (though we checked earlier)
     console.warn(`Update operation affected 0 rows for person ID: ${personId}`);
-    // Decide how to handle this - maybe still return the person?
   }
 
-  // 6. Return the potentially updated person data (fetch again or merge)
-  // Fetching again ensures we return the *actual* state from the DB
+  // 6. Return updated person data
   const updatedPerson = await PersonModel.getPersonById(personId);
   return updatedPerson;
 }
-
+/*
 async function deletePerson(personId) {
   const person = await PersonModel.getPersonById(personId);
   if (!person) {
@@ -105,11 +93,11 @@ async function deletePerson(personId) {
   await PersonModel.deletePerson(personId);
   return;
 }
-
+*/
 export {
   createPerson,
   getPersonById,
   updatePerson,
-  deletePerson,
+  //deletePerson,
   getAllPeople,
 };

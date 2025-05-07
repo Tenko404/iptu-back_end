@@ -52,8 +52,6 @@ CREATE TABLE property_people (
     FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
 );
 
--- User creation (remember to replace with strong passwords!)
--- DROP USER 'root'@'localhost'; -- Keep this commented out!
 CREATE USER 'root'@'localhost' IDENTIFIED BY 'your_very_strong_root_password';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
 

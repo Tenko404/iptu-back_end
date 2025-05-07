@@ -4,16 +4,15 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization; // Get the Authorization header
+  const authHeader = req.headers.authorization; // Get Auth header
 
   if (!authHeader) {
     return res
       .status(403)
-      .json({ message: "Token de autenticação não fornecido." }); // 403 Forbidden
+      .json({ message: "Token de autenticação não fornecido." });
   }
 
-  // The header should be in the format: "Bearer <token>"
-  const token = authHeader.split(" ")[1]; // Split by space and take the second part
+  const token = authHeader.split(" ")[1];
 
   if (!token) {
     return res
@@ -22,26 +21,27 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token
-    req.user = decoded; // Attach the decoded user information to the request object
-    next(); // Call the next middleware/route handler
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
   } catch (error) {
     console.error(error);
-    return res.status(401).json({ message: "Token de autenticação inválido." }); // 401 Unauthorized
+    return res.status(401).json({ message: "Token de autenticação inválido." });
   }
 };
 
+// admin role
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
-    next(); // User is an admin, proceed
+    next();
   } else {
     res.status(403).json({
       message: "Acesso não autorizado. Requer permissão de administrador.",
-    }); // 403 Forbidden
+    });
   }
 };
 
-// New middleware for 'staff' role
+// staff role
 const isStaff = (req, res, next) => {
   if (req.user && req.user.role === "staff") {
     next();
@@ -52,7 +52,7 @@ const isStaff = (req, res, next) => {
   }
 };
 
-// New middleware for 'dev' role
+// dev role
 const isDev = (req, res, next) => {
   if (req.user && req.user.role === "dev") {
     next();
