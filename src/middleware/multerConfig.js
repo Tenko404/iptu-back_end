@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 1024 * 1024 * 5, // 5MB
+    fileSize: 1024 * 1024 * 5,
   },
   fileFilter: function (req, file, cb) {
     const allowedExtensions = [".jpg", ".jpeg", ".png"];
@@ -32,4 +32,4 @@ const upload = multer({
   },
 });
 
-export default upload; // Export the configured multer instance
+export default upload; // Export multer instance

@@ -11,32 +11,34 @@ import {
   createPropertyRequest,
   updatePropertyRequest,
 } from "../request/propertyRequest.js";
-import upload from "../middleware/multerConfig.js"; // IMPORT FROM THE NEW FILE
-import { verifyToken, isAdmin, isStaff, isDev } from "../middleware/auth.js"; // Import the middleware
+import upload from "../middleware/multerConfig.js";
+import { verifyToken, isAdmin, isStaff, isDev } from "../middleware/auth.js";
 import { hasRole } from "../middleware/authUtils.js";
 
 const router = express.Router();
 
 // --- User Routes ---
-router.post("/api/users/login", loginRequest, UserController.login); // No authentication required for login
+router.post("/api/users/login", loginRequest, UserController.login);
 
 // --- People Routes ---
-router.get("/api/people/:id", verifyToken, PeopleController.getPersonById); // Requires authentication
-router.get("/api/people", verifyToken, PeopleController.getAllPeople); // Requires authentication
+router.get("/api/people/:id", verifyToken, PeopleController.getPersonById);
+router.get("/api/people", verifyToken, PeopleController.getAllPeople);
+
 router.put(
   "/api/people/:id",
   verifyToken,
-  isDev,
+  hasRole(["admin", "dev"]),
   updatePersonRequest,
   PeopleController.updatePerson
-); // Requires authentication AND dev role
+);
+/*
 router.delete(
   "/api/people/:id",
   verifyToken,
-  isDev,
+  hasRole(["admin", "dev"]),
   PeopleController.deletePerson
-); // Requires authentication AND dev role
-
+);
+*/
 // --- Property Routes ---
 router.post(
   "/api/properties",
@@ -47,12 +49,12 @@ router.post(
   ]),
   createPropertyRequest,
   PropertyController.createProperty
-); // Requires authentication
+);
 router.get(
   "/api/properties/:id",
   verifyToken,
   PropertyController.getPropertyById
-); // Requires authentication
+);
 router.get("/api/properties", verifyToken, PropertyController.getAllProperties); // Requires authentication
 router.put(
   "/api/properties/:id",
@@ -63,12 +65,11 @@ router.put(
   ]),
   updatePropertyRequest,
   PropertyController.updateProperty
-); // Requires authentication
+);
 router.delete(
   "/api/properties/:id",
   verifyToken,
-  // isDev, // <<<--- REMOVE the single role check
-  hasRole(["admin", "dev"]), // <<<--- ADD check for multiple roles
+  hasRole(["admin", "dev"]),
   PropertyController.deleteProperty
 );
 

@@ -17,7 +17,6 @@ export const createPerson = async (req, res) => {
   } catch (error) {
     console.error("Error in createPerson controller:", error);
     if (error.code === "ER_DUP_ENTRY") {
-      // Assuming you have a unique constraint on document (CPF/CNPJ)
       res.status(409).json({
         message: "Já existe uma pessoa cadastrada com este documento.",
       });
@@ -27,14 +26,13 @@ export const createPerson = async (req, res) => {
   }
 };
 
-// Get a person by ID
+// Get person by ID
 export const getPersonById = async (req, res) => {
   try {
     const personId = req.params.id;
     const person = await PeopleService.getPersonById(personId);
 
     if (!person) {
-      // This check *was* already here, and it's correct!
       return res.status(404).json({ message: "Pessoa não encontrada." });
     }
 
@@ -45,7 +43,7 @@ export const getPersonById = async (req, res) => {
   }
 };
 
-//get all people
+// Get all people
 export const getAllPeople = async (req, res) => {
   try {
     const people = await PeopleService.getAllPeople();
@@ -56,7 +54,7 @@ export const getAllPeople = async (req, res) => {
   }
 };
 
-// Update a person
+// Update person
 export const updatePerson = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -66,19 +64,27 @@ export const updatePerson = async (req, res) => {
 
     const personId = req.params.id;
     const personData = req.body;
-    const updatedPerson = await PeopleService.updatePerson(
-      personId,
-      personData
-    );
+
+    await PeopleService.updatePerson(personId, personData);
+
     res.status(200).json({ message: "Pessoa atualizada com sucesso!" });
   } catch (error) {
     console.error("Error in updatePerson controller:", error);
-    if (error.code === "ER_DUP_ENTRY") {
-      res.status(409).json({
-        message: "Já existe uma pessoa cadastrada com este documento.",
-      });
-    } else if (error.message === "Person not found") {
+
+    if (error.message === "Person not found") {
       res.status(404).json({ message: error.message });
+    } else if (
+      error.message.includes(
+        "Já existe outra pessoa cadastrada com este documento"
+      )
+    ) {
+      res.status(409).json({
+        message: "Já existe outra pessoa cadastrada com este documento.",
+      });
+    } else if (error.code === "ER_DUP_ENTRY") {
+      res
+        .status(409)
+        .json({ message: "Erro de duplicidade no banco de dados." });
     } else {
       res.status(500).json({ message: "Erro interno do servidor." });
     }
@@ -86,6 +92,7 @@ export const updatePerson = async (req, res) => {
 };
 
 // Delete a person
+/*
 export const deletePerson = async (req, res) => {
   try {
     const personId = req.params.id;
@@ -101,3 +108,4 @@ export const deletePerson = async (req, res) => {
     }
   }
 };
+*/
