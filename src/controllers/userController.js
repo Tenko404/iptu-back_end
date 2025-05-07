@@ -3,16 +3,14 @@ import { validationResult } from "express-validator";
 
 export const login = async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { employee_id, password } = req.body;
-    const result = await UserService.login(employee_id, password); // Call the service
+    const result = await UserService.login(employee_id, password);
 
-    // If successful, return user data and token
     res.status(200).json(result);
   } catch (error) {
     console.error("Error in login controller:", error);

@@ -1,4 +1,3 @@
-// person.js
 import pool from "../config/db.js";
 
 async function createPerson(
@@ -9,11 +8,9 @@ async function createPerson(
   phoneNumber,
   connection
 ) {
-  // Add connection
-  const db = connection || pool; // Use connection if provided, otherwise use pool
+  const db = connection || pool;
   try {
     const [result] = await db.query(
-      // Use 'db' instead of 'pool'
       "INSERT INTO people (name, document_type, document, email, phone_number) VALUES (?, ?, ?, ?, ?)",
       [name, documentType, document, email, phoneNumber]
     );
@@ -31,11 +28,9 @@ async function createPerson(
   }
 }
 async function getPersonByDocument(documentType, document, connection) {
-  // Add connection
   const db = connection || pool;
   try {
     const [rows] = await db.query(
-      // Use 'db' instead of 'pool'
       "SELECT * FROM people WHERE document_type = ? AND document = ?",
       [documentType, document]
     );
@@ -47,7 +42,6 @@ async function getPersonByDocument(documentType, document, connection) {
 }
 
 async function getPersonById(id, connection) {
-  // Add connection
   const db = connection || pool;
   try {
     const [rows] = await db.query("SELECT * FROM people WHERE id = ?", [id]);
@@ -59,7 +53,6 @@ async function getPersonById(id, connection) {
 }
 
 async function getAllPeople(connection) {
-  // Add connection
   const db = connection || pool;
   try {
     const [rows] = await db.query("SELECT * FROM people");
@@ -72,46 +65,38 @@ async function getAllPeople(connection) {
 
 async function updatePerson(id, personData, connection) {
   const db = connection || pool;
-  // Filter out undefined values explicitly, although the dynamic query builder handles missing keys
   const validData = Object.fromEntries(
     Object.entries(personData).filter(([_, value]) => value !== undefined)
   );
 
-  // Get the keys provided in the personData object
   const fields = Object.keys(validData);
 
-  // If no fields are provided to update, return early (or handle as needed)
   if (fields.length === 0) {
     // console.log("No fields provided to update person.");
-    return { affectedRows: 0 }; // Or throw an error if update must change something
+    return { affectedRows: 0 };
   }
 
-  // Dynamically build the SET part of the query
-  // Example: SET name = ?, email = ?, phone_number = ?
+  // Build SET part of the query
   const setClause = fields.map((field) => `${field} = ?`).join(", ");
 
-  // Get the corresponding values in the correct order
+  // Get values in correct order
   const values = fields.map((field) => validData[field]);
 
-  // Add the person's ID to the end of the values array for the WHERE clause
+  // Add persons ID to the end of the values array
   values.push(id);
 
   const sql = `UPDATE people SET ${setClause} WHERE id = ?`;
 
   try {
     const [result] = await db.query(sql, values);
-    // Return the result object which includes affectedRows
-    // The service layer can check result.affectedRows > 0 to confirm update
     return result;
   } catch (error) {
     console.error("Error in updatePerson model:", error);
-    // Handle specific errors if needed (like ER_DUP_ENTRY for document)
-    throw error; // Re-throw for the service layer
+    throw error;
   }
 }
-
+/*
 async function deletePerson(id, connection) {
-  // Add connection
   const db = connection || pool;
   try {
     const [result] = await db.query("DELETE FROM people WHERE id = ?", [id]);
@@ -121,12 +106,12 @@ async function deletePerson(id, connection) {
     throw error;
   }
 }
-
+*/
 export {
   createPerson,
   getPersonByDocument,
   getPersonById,
   updatePerson,
-  deletePerson,
+  //deletePerson,
   getAllPeople,
 };

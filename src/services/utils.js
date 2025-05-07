@@ -1,5 +1,5 @@
 function isValidCPF(cpf) {
-  cpf = cpf.replace(/[^\d]+/g, ""); // Remove non-digits
+  cpf = cpf.replace(/[^\d]+/g, "");
   if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
   cpf = cpf.split("");
 
@@ -23,7 +23,7 @@ function isValidCPF(cpf) {
 }
 
 function isValidCNPJ(cnpj) {
-  cnpj = cnpj.replace(/[^\d]+/g, ""); // Remove non-digits
+  cnpj = cnpj.replace(/[^\d]+/g, "");
 
   if (cnpj.length !== 14 || !!cnpj.match(/(\d)\1{13}/)) return false;
   cnpj = cnpj.split("");
@@ -56,8 +56,5 @@ function isValidCNPJ(cnpj) {
 
   return true;
 }
-
-// REMOVE THIS FUNCTION:
-// async function getAddressFromCEP(cep) { ... }
 
 export { isValidCPF, isValidCNPJ };
