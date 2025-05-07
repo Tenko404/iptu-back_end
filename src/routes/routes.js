@@ -13,6 +13,7 @@ import {
 } from "../request/propertyRequest.js";
 import upload from "../middleware/multerConfig.js"; // IMPORT FROM THE NEW FILE
 import { verifyToken, isAdmin, isStaff, isDev } from "../middleware/auth.js"; // Import the middleware
+import { hasRole } from "../middleware/authUtils.js";
 
 const router = express.Router();
 
@@ -66,8 +67,9 @@ router.put(
 router.delete(
   "/api/properties/:id",
   verifyToken,
-  isDev,
+  // isDev, // <<<--- REMOVE the single role check
+  hasRole(["admin", "dev"]), // <<<--- ADD check for multiple roles
   PropertyController.deleteProperty
-); // Requires authentication AND dev role
+);
 
 export default router;
