@@ -52,9 +52,6 @@ CREATE TABLE property_people (
     FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
 );
 
-CREATE USER 'root'@'localhost' IDENTIFIED BY 'your_very_strong_root_password';
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
-
 CREATE USER 'imoveis_app_user'@'localhost' IDENTIFIED BY 'your_app_password';
 GRANT SELECT, INSERT, UPDATE, DELETE ON imoveis_db.* TO 'imoveis_app_user'@'localhost';
 
