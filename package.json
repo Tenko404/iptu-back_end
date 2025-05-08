@@ -1,0 +1,38 @@
+{
+  "name": "iptu-back_end",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "back-end do sistema de IPTU para a Prefeitura de Vassouras",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tenko404/iptu-back_end.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Tenko404/iptu-back_end/issues"
+  },
+  "homepage": "https://github.com/Tenko404/iptu-back_end#readme",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^3.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "flat": "^6.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
