@@ -67,18 +67,22 @@ async function updatePerson(personId, personData) {
     Object.entries(personData).filter(([_, value]) => value !== undefined)
   );
 
+  /*
   if (Object.keys(dataToUpdate).length === 0) {
     console.log("No valid fields provided for person update.");
     return personExists;
   }
+*/
 
   // 4. Call the updated model function
-  const result = await PersonModel.updatePerson(personId, dataToUpdate); // Pass connection if in transaction context
+  const result = await PersonModel.updatePerson(personId, dataToUpdate);
 
   // 5. Check if update actually occurred
+  /*
   if (result.affectedRows === 0) {
     console.warn(`Update operation affected 0 rows for person ID: ${personId}`);
   }
+*/
 
   // 6. Return updated person data
   const updatedPerson = await PersonModel.getPersonById(personId);

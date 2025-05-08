@@ -72,7 +72,6 @@ async function updatePerson(id, personData, connection) {
   const fields = Object.keys(validData);
 
   if (fields.length === 0) {
-    // console.log("No fields provided to update person.");
     return { affectedRows: 0 };
   }
 

@@ -24,12 +24,14 @@ app.use(express.json());
 // Parse URL-encoded request bodies (for form data)
 app.use(express.urlencoded({ extended: true }));
 
-//app.use((req, res, next) => {
-//  if (req.body) {
-//    req.body = unflatten(req.body);
-//  }
-//  next();
-//});
+/*
+app.use((req, res, next) => {
+  if (req.body) {
+    req.body = unflatten(req.body);
+  }
+  next();
+});
+*/
 
 // --- Routes ---
 app.use(routes);
