@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization; // Get Auth header
+  const authHeader = req.headers.authorization;
 
   if (!authHeader) {
     return res

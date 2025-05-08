@@ -2,6 +2,7 @@ import pool from "../config/db.js";
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
 
+// --- findOrCreatePerson ---
 async function findOrCreatePerson(personData, connection) {
   if (!personData) {
     return null;
@@ -19,18 +20,12 @@ async function findOrCreatePerson(personData, connection) {
         "Document type and document are required to find or create a person by document."
       );
     } else {
-      console.log(
-        "findOrCreatePerson called with insufficient data, returning null."
-      );
       return null;
     }
   }
 
   try {
     // 1. Try to find existing person by document using the transaction connection
-    console.log(
-      `Searching for person with document: ${document_type} - ${document}`
-    );
     let existingPerson = await PersonModel.getPersonByDocument(
       document_type,
       document,
@@ -38,7 +33,6 @@ async function findOrCreatePerson(personData, connection) {
     );
 
     if (existingPerson) {
-      console.log(`Found existing person ID: ${existingPerson.id}`);
       // 2. Person exists: Update IF name, email, or phone_number are explicitly provided in the input `personData`
       const updateData = {};
       if (personData.hasOwnProperty("name") && name !== undefined)
@@ -52,25 +46,15 @@ async function findOrCreatePerson(personData, connection) {
         updateData.phone_number = phone_number;
 
       if (Object.keys(updateData).length > 0) {
-        console.log(
-          `Updating existing person ${existingPerson.id} with data:`,
-          updateData
-        );
         await PersonModel.updatePerson(
           existingPerson.id,
           updateData,
           connection
         );
       } else {
-        console.log(
-          `Found existing person ${existingPerson.id}, no new details provided to update.`
-        );
       }
       return existingPerson.id;
     } else {
-      console.log(
-        `Person with document ${document} not found. Attempting to create.`
-      );
       // 3. Person doesn't exist? Create a new person
       if (
         name === undefined ||
@@ -87,7 +71,6 @@ async function findOrCreatePerson(personData, connection) {
         );
       }
 
-      console.log(`Creating new person with document ${document}`);
       const newPerson = await PersonModel.createPerson(
         name,
         document_type,
@@ -108,6 +91,7 @@ async function findOrCreatePerson(personData, connection) {
   }
 }
 
+// --- createProperty ---
 async function createProperty(propertyData) {
   const connection = await pool.getConnection();
   try {
@@ -180,6 +164,7 @@ async function createProperty(propertyData) {
   }
 }
 
+// --- getPropertyById ---
 async function getPropertyById(propertyId) {
   try {
     const property = await PropertyModel.getPropertyById(propertyId);
@@ -205,6 +190,7 @@ async function getPropertyById(propertyId) {
   }
 }
 
+// --- getAllProperties ---
 async function getAllProperties() {
   // 1. Fetch all base properties (Query 1)
   const properties = await PropertyModel.getAllProperties();
@@ -275,10 +261,6 @@ async function getAllProperties() {
 // --- updateProperty ---
 async function updateProperty(propertyId, propertyData) {
   const connection = await pool.getConnection();
-  console.log(
-    "updateProperty service START (using findOrCreatePerson), propertyId:",
-    propertyId
-  );
 
   try {
     await connection.beginTransaction();
@@ -288,7 +270,6 @@ async function updateProperty(propertyId, propertyData) {
     if (!existingProperty) {
       throw new Error("Propriedade não encontrada.");
     }
-    console.log("Property exists:", existingProperty.id);
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
@@ -323,14 +304,12 @@ async function updateProperty(propertyId, propertyData) {
         );
         throw new Error("Failed to find current owner for property.");
       }
-      console.log(`Keeping existing owner ID: ${targetOwnerId}`);
     }
 
     // --- Handle Possessor ---
     if (propertyData.hasOwnProperty("possessor")) {
       if (possessor === null) {
         targetPossessorId = null;
-        console.log("Request to remove possessor.");
       } else {
         targetPossessorId = await findOrCreatePerson(possessor, connection);
         if (!targetPossessorId) {
@@ -343,14 +322,12 @@ async function updateProperty(propertyId, propertyData) {
       ).find((p) => p.relationship_type === "possessor");
       targetPossessorId = currentPossessor?.id;
       possessorDescription = currentPossessor?.description;
-      console.log(`Keeping existing possessor ID: ${targetPossessorId}`);
     }
 
     // --- Handle Executor ---
     if (propertyData.hasOwnProperty("executor")) {
       if (executor === null) {
         targetExecutorId = null;
-        console.log("Request to remove executor.");
       } else {
         targetExecutorId = await findOrCreatePerson(executor, connection);
         if (!targetExecutorId) {
@@ -363,14 +340,7 @@ async function updateProperty(propertyId, propertyData) {
       ).find((p) => p.relationship_type === "executor");
       targetExecutorId = currentExecutor?.id;
       executorDescription = currentExecutor?.description;
-      console.log(`Keeping existing executor ID: ${targetExecutorId}`);
     }
-
-    console.log("Final Target People IDs:", {
-      targetOwnerId,
-      targetPossessorId,
-      targetExecutorId,
-    });
 
     // 3. Prepare Property Data for Update
     const dataToUpdate = { ...otherPropertyData };
@@ -383,22 +353,17 @@ async function updateProperty(propertyId, propertyData) {
       Object.entries(dataToUpdate).filter(([key, value]) => value !== undefined)
     );
 
-    console.log("Final property data for update:", finalPropertyUpdateData);
-
     // 4. Update Property Details (SINGLE CALL)
     if (Object.keys(finalPropertyUpdateData).length > 0) {
-      console.log("Updating property fields:", finalPropertyUpdateData);
       await PropertyModel.updateProperty(
         propertyId,
         finalPropertyUpdateData,
         connection
       );
     } else {
-      console.log("No property fields to update.");
     }
 
     // 5. Update Relationships (Remove all and Re-add)
-    console.log("Updating relationships...");
     await PropertyModel.removePropertyPeople(propertyId, connection);
 
     // Link Target Owner
@@ -432,10 +397,8 @@ async function updateProperty(propertyId, propertyData) {
         connection
       );
     }
-    console.log("Relationships updated.");
 
     await connection.commit();
-    console.log("Transaction committed.");
 
     // 6. Fetch and return the fully updated property representation
     const updatedProperty = await getPropertyById(propertyId);
@@ -446,7 +409,6 @@ async function updateProperty(propertyId, propertyData) {
     throw error;
   } finally {
     connection.release();
-    console.log("Connection released.");
   }
 }
 
@@ -476,14 +438,8 @@ async function deleteProperty(propertyId) {
         const remainingAssociations =
           await PropertyModel.getPropertiesByPersonId(person.id, connection);
         if (remainingAssociations.length === 0) {
-          console.log(
-            `Person ${person.id} has no remaining associations. Deleting...`
-          );
           await PersonModel.deletePerson(person.id, connection);
         } else {
-          console.log(
-            `Person ${person.id} still has ${remainingAssociations.length} associations. Not deleting.`
-          );
         }
       }
     }
@@ -493,7 +449,6 @@ async function deleteProperty(propertyId) {
     await checkAndDeletePerson(executor);
 
     await connection.commit();
-    console.log("Transaction committed (DELETE).");
   } catch (error) {
     if (!error.message.includes("Property not found")) {
       await connection.rollback();
@@ -504,7 +459,6 @@ async function deleteProperty(propertyId) {
     throw error;
   } finally {
     connection.release();
-    console.log("Connection released (DELETE).");
   }
 }
 

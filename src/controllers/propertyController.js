@@ -5,12 +5,7 @@ import { isValidCPF, isValidCNPJ } from "../services/utils.js";
 import { unflatten } from "flat";
 
 export const createProperty = async (req, res) => {
-  console.log("--- Inside createProperty Controller ---");
-  console.log("Raw req.body received:", JSON.stringify(req.body, null, 2));
-  console.log("req.files:", req.files);
-
   const unflattenedBody = unflatten(req.body || {});
-  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2)); // Unflattening log
 
   try {
     const errors = validationResult(req);
@@ -68,11 +63,6 @@ export const createProperty = async (req, res) => {
       front_photo: frontPhotoPath,
       above_photo: abovePhotoPath,
     };
-
-    console.log(
-      "Data prepared for service:",
-      JSON.stringify(propertyData, null, 2)
-    );
 
     const newProperty = await PropertyService.createProperty(propertyData);
     res.status(201).json({
@@ -136,16 +126,12 @@ export const getAllProperties = async (req, res) => {
 };
 
 export const updateProperty = async (req, res) => {
-  console.log("--- updateProperty (Controller) ---");
-  console.log("1. req.params:", req.params);
-  console.log("2. req.body:", req.body);
   const propertyId = req.params.id;
-  console.log("4. propertyId:", propertyId);
 
   const unflattenedBody = unflatten(req.body || {});
-  console.log("Unflattened body:", JSON.stringify(unflattenedBody, null, 2));
 
   // --- Controller-Side Existence Check ---
+  /*
   try {
     const propertyExists = await PropertyModel.propertyExists(propertyId);
     if (!propertyExists) {
@@ -158,17 +144,14 @@ export const updateProperty = async (req, res) => {
       .status(500)
       .json({ message: "Erro ao verificar existência da propriedade." });
   }
-
-  console.log("Property exists (Controller Check), proceeding...");
+*/
 
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("3. Validation Errors:", errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
-    const propertyId = req.params.id;
-    console.log("4. propertyId:", propertyId);
+    //const propertyId = req.params.id;
 
     if (Object.keys(req.body).length === 0) {
       return res
@@ -188,7 +171,6 @@ export const updateProperty = async (req, res) => {
     }
 
     // --- Conditional Validation for Possessor/Executor ---
-    // Check Possessor
     if (unflattenedBody.possessor) {
       if (unflattenedBody.possessor.document_type === "CPF") {
         if (!isValidCPF(unflattenedBody.possessor.document)) {
@@ -239,21 +221,10 @@ export const updateProperty = async (req, res) => {
       above_photo: abovePhotoPath,
     };
 
-    console.log(
-      "Data prepared for service (UPDATE):",
-      JSON.stringify(propertyData, null, 2)
-    );
-    console.log(
-      "7. Calling PropertyService.updateProperty with propertyData:",
-      propertyData
-    );
-
     const updatedProperty = await PropertyService.updateProperty(
       propertyId,
       propertyData
     );
-
-    console.log("8. updateProperty service returned:", updatedProperty);
 
     res.status(200).json({
       message: "Propriedade atualizada com sucesso!",
