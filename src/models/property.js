@@ -23,8 +23,12 @@ async function createProperty(propertyData, connection) {
   try {
     const [result] = await db.query(
       `
-      INSERT INTO properties (street, house_number, neighborhood, complement, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO properties (
+        street, house_number, neighborhood, complement,
+        property_registration, logradouro_code, secao_code, tax_type,
+        land_area, built_area, front_photo, above_photo
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         street,
