@@ -79,7 +79,7 @@ async function findOrCreatePerson(personData, connection) {
         phone_number,
         connection
       );
-      console.log(`Created new person with ID: ${newPerson.id}`);
+      // console.log(`Created new person with ID: ${newPerson.id}`);
       return newPerson.id;
     }
   } catch (error) {
@@ -97,40 +97,67 @@ async function createProperty(propertyData) {
   try {
     await connection.beginTransaction();
 
-    const { owner, possessor, executor, ...otherPropertyData } = propertyData;
+    const {
+      owner,
+      possessor,
+      executor,
+      logradouro_code,
+      secao_code,
+      ...otherPropertyData
+    } = propertyData;
 
-    // --- 1. Create Owner (Always Required) ---
+    // --- Basic service-level validation for new NOT NULL fields ---
+    if (!logradouro_code) {
+      await connection.rollback(); // Rollback before throwing
+      connection.release();
+      throw new Error("Logradouro code is required for property creation.");
+    }
+    if (!secao_code) {
+      await connection.rollback(); // Rollback before throwing
+      connection.release();
+      throw new Error("Seção code is required for property creation.");
+    }
+
+    // --- 1. Handle People ---
     const ownerId = await findOrCreatePerson(owner, connection);
-
-    // --- 2. Create Possessor (Optional) ---
-    let possessorId = null;
-    if (possessor) {
-      possessorId = await findOrCreatePerson(possessor, connection);
+    if (!ownerId) {
+      // Ensure owner processing was successful
+      await connection.rollback();
+      connection.release();
+      throw new Error("Failed to process owner for property creation.");
     }
-
-    // --- 3. Create Executor (Optional) ---
-    let executorId = null;
-    if (executor) {
-      executorId = await findOrCreatePerson(executor, connection);
-    }
+    let possessorId = possessor
+      ? await findOrCreatePerson(possessor, connection)
+      : null;
+    let executorId = executor
+      ? await findOrCreatePerson(executor, connection)
+      : null;
 
     // --- 4. Create the Property ---
-    const newProperty = await PropertyModel.createProperty(
-      otherPropertyData,
+    // Construct the data object specifically for PropertyModel.createProperty
+    const propertyModelData = {
+      ...otherPropertyData, // Contains street, tax_type, areas, photos etc.
+      logradouro_code, // Explicitly add logradouro_code
+      secao_code, // Explicitly add secao_code
+    };
+    const newPropertyResult = await PropertyModel.createProperty(
+      // Used to be newProperty
+      propertyModelData, // Pass the object containing all necessary fields
       connection
     );
+    const newPropertyId = newPropertyResult.id; // Assuming model returns {id, ...}
 
     // --- 5. Link relationships ---
     await PropertyModel.linkPropertyToPerson(
-      newProperty.id,
+      newPropertyId,
       ownerId,
       "owner",
-      null,
+      owner?.description,
       connection
     );
     if (possessorId) {
       await PropertyModel.linkPropertyToPerson(
-        newProperty.id,
+        newPropertyId,
         possessorId,
         "possessor",
         possessor.description,
@@ -139,7 +166,7 @@ async function createProperty(propertyData) {
     }
     if (executorId) {
       await PropertyModel.linkPropertyToPerson(
-        newProperty.id,
+        newPropertyId,
         executorId,
         "executor",
         executor.description,
@@ -148,19 +175,33 @@ async function createProperty(propertyData) {
     }
 
     await connection.commit();
-    return {
-      id: newProperty.id,
-      ...otherPropertyData,
-      owner: { id: ownerId, ...owner },
-      possessor: possessorId ? { id: possessorId, ...possessor } : null,
-      executor: executorId ? { id: executorId, ...executor } : null,
-    };
+
+    const fullNewProperty = await getPropertyById(newPropertyId);
+    return fullNewProperty;
   } catch (error) {
-    await connection.rollback();
-    console.error("Transaction rolled back:", error);
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("Error during rollback:", rollbackError);
+      }
+    }
+    console.error("Error in service createProperty:", error);
     throw error;
   } finally {
-    connection.release();
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      connection.release();
+    }
   }
 }
 
@@ -343,14 +384,17 @@ async function updateProperty(propertyId, propertyData) {
     }
 
     // 3. Prepare Property Data for Update
-    const dataToUpdate = { ...otherPropertyData };
+    const dataToUpdateModel = { ...otherPropertyData };
+
     if (propertyData.hasOwnProperty("front_photo"))
-      dataToUpdate.front_photo = propertyData.front_photo;
+      dataToUpdateModel.front_photo = propertyData.front_photo;
     if (propertyData.hasOwnProperty("above_photo"))
-      dataToUpdate.above_photo = propertyData.above_photo;
+      dataToUpdateModel.above_photo = propertyData.above_photo;
 
     const finalPropertyUpdateData = Object.fromEntries(
-      Object.entries(dataToUpdate).filter(([key, value]) => value !== undefined)
+      Object.entries(dataToUpdateModel).filter(
+        ([_, value]) => value !== undefined
+      )
     );
 
     // 4. Update Property Details (SINGLE CALL)
@@ -360,7 +404,6 @@ async function updateProperty(propertyId, propertyData) {
         finalPropertyUpdateData,
         connection
       );
-    } else {
     }
 
     // 5. Update Relationships (Remove all and Re-add)
@@ -399,16 +442,32 @@ async function updateProperty(propertyId, propertyData) {
     }
 
     await connection.commit();
-
-    // 6. Fetch and return the fully updated property representation
-    const updatedProperty = await getPropertyById(propertyId);
-    return updatedProperty;
+    const fullUpdatedProperty = await getPropertyById(propertyId);
+    return fullUpdatedProperty;
   } catch (error) {
-    await connection.rollback();
-    console.error("Transaction rolled back (UPDATE):", error);
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("Error during rollback (UPDATE):", rollbackError);
+      }
+    }
+    console.error("Error in service updateProperty:", error);
     throw error;
   } finally {
-    connection.release();
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      connection.release();
+    }
   }
 }
 

@@ -9,6 +9,8 @@ async function createProperty(propertyData, connection) {
     neighborhood,
     complement,
     property_registration,
+    logradouro_code,
+    secao_code,
     tax_type,
     land_area,
     built_area,
@@ -16,8 +18,10 @@ async function createProperty(propertyData, connection) {
     above_photo,
   } = propertyData;
 
+  const db = connection || pool;
+
   try {
-    const [result] = await connection.query(
+    const [result] = await db.query(
       `
       INSERT INTO properties (street, house_number, neighborhood, complement, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -28,6 +32,8 @@ async function createProperty(propertyData, connection) {
         neighborhood,
         complement,
         property_registration,
+        logradouro_code,
+        secao_code,
         tax_type,
         land_area,
         built_area,
@@ -36,7 +42,12 @@ async function createProperty(propertyData, connection) {
       ]
     );
 
-    return { id: result.insertId };
+    return {
+      id: result.insertId,
+      property_registration,
+      logradouro_code,
+      secao_code,
+    };
   } catch (error) {
     console.error("Error in createProperty:", error);
     throw error;
