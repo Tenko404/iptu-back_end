@@ -160,10 +160,14 @@ async function linkPropertyToPerson(
 async function getPeopleByPropertyId(propertyId) {
   try {
     const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.document, p.document_type, pp.relationship_type, pp.description
-        FROM people p
-        INNER JOIN property_people pp ON p.id = pp.person_id
-        WHERE pp.property_id = ?`,
+      `SELECT
+        p.id, p.name, p.document, p.document_type, p.email, p.phone_number,
+        p.residential_street, p.residential_house_number, p.residential_neighborhood,
+        p.residential_complement, p.residential_city, p.residential_state, p.residential_zip_code,
+        pp.relationship_type, pp.description
+          FROM people p
+          INNER JOIN property_people pp ON p.id = pp.person_id
+          WHERE pp.property_id = ?`,
       [propertyId]
     );
     return rows;
