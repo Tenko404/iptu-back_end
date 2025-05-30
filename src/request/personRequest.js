@@ -68,6 +68,37 @@ const updatePersonRequest = [
       }
       return true;
     }),
+  body("residential_street")
+    .optional()
+    .isString()
+    .isLength({ max: 100 })
+    .withMessage("Residential street too long"),
+  body("residential_house_number")
+    .optional()
+    .isString()
+    .isLength({ max: 10 })
+    .withMessage("Residential house number too long"),
+  body("residential_neighborhood")
+    .optional()
+    .isString()
+    .isLength({ max: 50 })
+    .withMessage("Residential neighborhood too long"),
+  body("residential_complement").optional().isString().isLength({ max: 50 }),
+  body("residential_city")
+    .optional()
+    .isString()
+    .isLength({ max: 50 })
+    .withMessage("Residential city too long"),
+  body("residential_state")
+    .optional()
+    .isString()
+    .isLength({ min: 2, max: 2 })
+    .withMessage("Residential state must be 2 characters"),
+  body("residential_zip_code")
+    .optional()
+    .isString()
+    .matches(/^\d{5}-\d{3}$/)
+    .withMessage("Residential ZIP code invalid (e.g., 12345-678)"),
 ];
 
 export { createPersonRequest, updatePersonRequest };
