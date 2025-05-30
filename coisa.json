@@ -1,0 +1,33 @@
+{
+  "street": "Rua Com Possuidor Limpo",
+  "house_number": "301C",
+  "neighborhood": "Bairro do Possuidor Limpo",
+  "property_registration": "500503",
+  "logradouro_code": "88776658",
+  "secao_code": "88779",
+  "tax_type": "mixed",
+  "land_area": 300.0,
+  "built_area": 200.0,
+  "owner": {
+    "name": "Dono Para Possuidor Limpo",
+    "document_type": "CPF",
+    "document": "50050050077",
+    "email": "dono.poss.limpo@example.com",
+    "phone_number": "+55 (55) 77777-7778",
+    "residential_street": "Av. Principal Limpa",
+    "residential_house_number": "2",
+    "residential_neighborhood": "Centro Limpo",
+    "residential_city": "Capital Limpa",
+    "residential_state": "DF",
+    "residential_zip_code": "70000-001"
+  },
+  "possessor": {
+    "name": "Possuidor Sem Endereco",
+    "document_type": "CPF",
+    "document": "60060060077",
+    "email": "poss.semend@example.com",
+    "phone_number": "+55 (66) 11111-1112",
+    "relationship_type": "possessor",
+    "description": "Possui sem endereco"
+  }
+}
