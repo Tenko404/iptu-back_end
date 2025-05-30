@@ -2,14 +2,26 @@ import pool from "../config/db.js";
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
 
-// --- findOrCreatePerson ---
-async function findOrCreatePerson(personData, connection) {
+async function findOrCreatePerson(personData, personRole, connection) {
   if (!personData) {
     return null;
   }
 
-  const { name, email, phone_number, document_type, document, ...otherData } =
-    personData;
+  const {
+    name,
+    email,
+    phone_number,
+    document_type,
+    document,
+    residential_street,
+    residential_house_number,
+    residential_neighborhood,
+    residential_complement,
+    residential_city,
+    residential_state,
+    residential_zip_code,
+    // ...otherData
+  } = personData;
 
   if (!document_type || !document) {
     if (name || email || phone_number) {
@@ -25,7 +37,6 @@ async function findOrCreatePerson(personData, connection) {
   }
 
   try {
-    // 1. Try to find existing person by document using the transaction connection
     let existingPerson = await PersonModel.getPersonByDocument(
       document_type,
       document,
@@ -33,7 +44,6 @@ async function findOrCreatePerson(personData, connection) {
     );
 
     if (existingPerson) {
-      // 2. Person exists: Update IF name, email, or phone_number are explicitly provided in the input `personData`
       const updateData = {};
       if (personData.hasOwnProperty("name") && name !== undefined)
         updateData.name = name;
@@ -45,27 +55,68 @@ async function findOrCreatePerson(personData, connection) {
       )
         updateData.phone_number = phone_number;
 
+      if (personRole === "owner") {
+        if (
+          personData.hasOwnProperty("residential_street") &&
+          residential_street !== undefined
+        )
+          updateData.residential_street = residential_street;
+        if (
+          personData.hasOwnProperty("residential_house_number") &&
+          residential_house_number !== undefined
+        )
+          updateData.residential_house_number = residential_house_number;
+        if (
+          personData.hasOwnProperty("residential_neighborhood") &&
+          residential_neighborhood !== undefined
+        )
+          updateData.residential_neighborhood = residential_neighborhood;
+        if (
+          personData.hasOwnProperty("residential_complement") &&
+          residential_complement !== undefined
+        ) {
+          updateData.residential_complement = residential_complement;
+        } else if (
+          personData.hasOwnProperty("residential_complement") &&
+          personData.residential_complement === null
+        ) {
+          updateData.residential_complement = null;
+        }
+        if (
+          personData.hasOwnProperty("residential_city") &&
+          residential_city !== undefined
+        )
+          updateData.residential_city = residential_city;
+        if (
+          personData.hasOwnProperty("residential_state") &&
+          residential_state !== undefined
+        )
+          updateData.residential_state = residential_state;
+        if (
+          personData.hasOwnProperty("residential_zip_code") &&
+          residential_zip_code !== undefined
+        )
+          updateData.residential_zip_code = residential_zip_code;
+      }
+
       if (Object.keys(updateData).length > 0) {
         await PersonModel.updatePerson(
           existingPerson.id,
           updateData,
           connection
         );
-      } else {
       }
       return existingPerson.id;
     } else {
-      // 3. Person doesn't exist? Create a new person
       if (
         name === undefined ||
         email === undefined ||
         phone_number === undefined
       ) {
-        console.error("Missing required fields for creating new person:", {
-          name,
-          email,
-          phone_number,
-        });
+        console.error(
+          "Missing required fields (name, email, phone) for creating new person:",
+          { name, email, phone_number, document_type, document }
+        );
         throw new Error(
           "Name, email, and phone number are required to create a new person when document is not found."
         );
@@ -77,14 +128,29 @@ async function findOrCreatePerson(personData, connection) {
         document,
         email,
         phone_number,
+        personRole === "owner" ? residential_street : null,
+        personRole === "owner" ? residential_house_number : null,
+        personRole === "owner" ? residential_neighborhood : null,
+        personRole === "owner" ? residential_complement : null,
+        personRole === "owner" ? residential_city : null,
+        personRole === "owner" ? residential_state : null,
+        personRole === "owner" ? residential_zip_code : null,
         connection
       );
-      // console.log(`Created new person with ID: ${newPerson.id}`);
+
+      if (!newPerson || newPerson.id === undefined) {
+        console.error(
+          "PersonModel.createPerson did not return a valid person object with an ID."
+        );
+        throw new Error(
+          "Failed to create person record due to internal model error."
+        );
+      }
       return newPerson.id;
     }
   } catch (error) {
     console.error(
-      `Error during findOrCreatePerson for document ${document_type} / ${document}:`,
+      `Error during findOrCreatePerson for document ${document_type} / ${document} (Role: ${personRole}):`,
       error
     );
     throw error;
@@ -108,44 +174,41 @@ async function createProperty(propertyData) {
 
     // --- Basic service-level validation for new NOT NULL fields ---
     if (!logradouro_code) {
-      await connection.rollback(); // Rollback before throwing
+      await connection.rollback();
       connection.release();
       throw new Error("Logradouro code is required for property creation.");
     }
     if (!secao_code) {
-      await connection.rollback(); // Rollback before throwing
+      await connection.rollback();
       connection.release();
       throw new Error("Seção code is required for property creation.");
     }
 
     // --- 1. Handle People ---
-    const ownerId = await findOrCreatePerson(owner, connection);
+    const ownerId = await findOrCreatePerson(owner, "owner", connection);
     if (!ownerId) {
-      // Ensure owner processing was successful
       await connection.rollback();
       connection.release();
       throw new Error("Failed to process owner for property creation.");
     }
     let possessorId = possessor
-      ? await findOrCreatePerson(possessor, connection)
+      ? await findOrCreatePerson(possessor, "possessor", connection)
       : null;
     let executorId = executor
-      ? await findOrCreatePerson(executor, connection)
+      ? await findOrCreatePerson(executor, "executor", connection)
       : null;
 
     // --- 4. Create the Property ---
-    // Construct the data object specifically for PropertyModel.createProperty
     const propertyModelData = {
-      ...otherPropertyData, // Contains street, tax_type, areas, photos etc.
-      logradouro_code, // Explicitly add logradouro_code
-      secao_code, // Explicitly add secao_code
+      ...otherPropertyData,
+      logradouro_code,
+      secao_code,
     };
     const newPropertyResult = await PropertyModel.createProperty(
-      // Used to be newProperty
-      propertyModelData, // Pass the object containing all necessary fields
+      propertyModelData,
       connection
     );
-    const newPropertyId = newPropertyResult.id; // Assuming model returns {id, ...}
+    const newPropertyId = newPropertyResult.id;
 
     // --- 5. Link relationships ---
     await PropertyModel.linkPropertyToPerson(
@@ -160,7 +223,7 @@ async function createProperty(propertyData) {
         newPropertyId,
         possessorId,
         "possessor",
-        possessor.description,
+        possessor?.description,
         connection
       );
     }
@@ -169,7 +232,7 @@ async function createProperty(propertyData) {
         newPropertyId,
         executorId,
         "executor",
-        executor.description,
+        executor?.description,
         connection
       );
     }
@@ -328,7 +391,7 @@ async function updateProperty(propertyId, propertyData) {
         console.error("Attempt to remove owner during update is not allowed.");
         throw new Error("Property must have an owner.");
       } else {
-        targetOwnerId = await findOrCreatePerson(owner, connection);
+        targetOwnerId = await findOrCreatePerson(owner, "owner", connection);
         ownerDescription = owner?.description;
         if (!targetOwnerId) {
           throw new Error("Failed to process owner information.");
@@ -352,7 +415,11 @@ async function updateProperty(propertyId, propertyData) {
       if (possessor === null) {
         targetPossessorId = null;
       } else {
-        targetPossessorId = await findOrCreatePerson(possessor, connection);
+        targetPossessorId = await findOrCreatePerson(
+          possessor,
+          "possessor",
+          connection
+        );
         if (!targetPossessorId) {
           throw new Error("Failed to process possessor information.");
         }
@@ -370,7 +437,11 @@ async function updateProperty(propertyId, propertyData) {
       if (executor === null) {
         targetExecutorId = null;
       } else {
-        targetExecutorId = await findOrCreatePerson(executor, connection);
+        targetExecutorId = await findOrCreatePerson(
+          executor,
+          "executor",
+          connection
+        );
         if (!targetExecutorId) {
           throw new Error("Failed to process executor information.");
         }
