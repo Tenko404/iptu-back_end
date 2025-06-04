@@ -31,6 +31,22 @@ const createPropertyRequest = [
     .withMessage("Property registration must have 6 digits")
     .notEmpty()
     .withMessage("Property registration is required"),
+  body("logradouro_code")
+    .trim()
+    .notEmpty()
+    .withMessage("Logradouro code is required")
+    .isNumeric({ no_symbols: true })
+    .withMessage("Logradouro code must contain only numbers")
+    .isLength({ min: 8, max: 8 })
+    .withMessage("Logradouro code must be exactly 8 digits"),
+  body("secao_code")
+    .trim()
+    .notEmpty()
+    .withMessage("Seção code is required")
+    .isNumeric({ no_symbols: true })
+    .withMessage("Seção code must contain only numbers")
+    .isLength({ min: 3, max: 5 })
+    .withMessage("Seção code must be exactly 5 digits"),
   body("tax_type")
     .isIn(["residential", "commercial", "mixed", "territorial"])
     .withMessage("Invalid tax type")
@@ -71,6 +87,40 @@ const createPropertyRequest = [
     .notEmpty()
     .withMessage("Owner document type is required"),
   body("owner.document").notEmpty().withMessage("Owner document is required"),
+  body("owner.residential_street")
+    .notEmpty()
+    .withMessage("Owner residential street is required")
+    .isString()
+    .isLength({ max: 100 }),
+  body("owner.residential_house_number")
+    .notEmpty()
+    .withMessage("Owner residential house number is required")
+    .isString()
+    .isLength({ max: 10 }),
+  body("owner.residential_neighborhood")
+    .notEmpty()
+    .withMessage("Owner residential neighborhood is required")
+    .isString()
+    .isLength({ max: 50 }),
+  body("owner.residential_complement")
+    .optional()
+    .isString()
+    .isLength({ max: 50 }),
+  body("owner.residential_city")
+    .notEmpty()
+    .withMessage("Owner residential city is required")
+    .isString()
+    .isLength({ max: 50 }),
+  body("owner.residential_state")
+    .notEmpty()
+    .withMessage("Owner residential state is required")
+    .isString()
+    .isLength({ min: 2, max: 2 }),
+  body("owner.residential_zip_code")
+    .notEmpty()
+    .withMessage("Owner residential ZIP code is required")
+    .isString()
+    .matches(/^\d{5}-\d{3}$/),
 
   // --- Possessor/Executor Information (Conditional) ---
   body("possessor.name")
@@ -168,6 +218,24 @@ const updatePropertyRequest = [
     .isLength({ min: 6, max: 6 })
     .withMessage("Property registration must have 6 digits")
     .optional(),
+  body("logradouro_code")
+    .trim()
+    .notEmpty()
+    .withMessage("Logradouro code is required for update")
+    .isNumeric({ no_symbols: true })
+    .withMessage("Logradouro code must contain only numbers")
+    .isLength({ min: 8, max: 8 })
+    .withMessage("Logradouro code must be exactly 8 digits")
+    .optional(),
+  body("secao_code")
+    .trim()
+    .notEmpty()
+    .withMessage("Seção code is required for update")
+    .isNumeric({ no_symbols: true })
+    .withMessage("Seção code must contain only numbers")
+    .isLength({ min: 5, max: 5 })
+    .withMessage("Seção code must be exactly 5 digits")
+    .optional(),
   body("tax_type")
     .isIn(["residential", "commercial", "mixed", "territorial"])
     .withMessage("Invalid tax type")
@@ -182,6 +250,7 @@ const updatePropertyRequest = [
     .optional(),
   body("front_photo").optional(),
   body("above_photo").optional(),
+
   body("owner.name")
     .isLength({ max: 150 })
     .withMessage("Owner name must be less than 150 characters")
@@ -199,6 +268,36 @@ const updatePropertyRequest = [
     .withMessage("Owner document type must be CPF or CNPJ")
     .optional(),
   body("owner.document").optional(),
+  body("owner.residential_street")
+    .if(body("owner").exists())
+    .notEmpty()
+    .withMessage(
+      "Owner residential street is required when owner data is provided"
+    )
+    .isString()
+    .isLength({ max: 100 }),
+  body("owner.residential_house_number")
+    .if(body("owner").exists())
+    .notEmpty()
+    .withMessage(
+      "Owner residential house number is required when owner data is provided"
+    )
+    .isString()
+    .isLength({ max: 10 }),
+  body("owner.residential_complement")
+    .if(body("owner").exists())
+    .optional()
+    .isString()
+    .isLength({ max: 50 }),
+  body("owner.residential_zip_code")
+    .if(body("owner").exists())
+    .notEmpty()
+    .withMessage(
+      "Owner residential ZIP is required when owner data is provided"
+    )
+    .isString()
+    .matches(/^\d{5}-\d{3}$/),
+
   body("possessor.name")
     .if(body("possessor").exists())
     .isLength({ max: 150 })

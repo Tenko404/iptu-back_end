@@ -2,14 +2,26 @@ import pool from "../config/db.js";
 import * as PropertyModel from "../models/property.js";
 import * as PersonModel from "../models/person.js";
 
-// --- findOrCreatePerson ---
-async function findOrCreatePerson(personData, connection) {
+async function findOrCreatePerson(personData, personRole, connection) {
   if (!personData) {
     return null;
   }
 
-  const { name, email, phone_number, document_type, document, ...otherData } =
-    personData;
+  const {
+    name,
+    email,
+    phone_number,
+    document_type,
+    document,
+    residential_street,
+    residential_house_number,
+    residential_neighborhood,
+    residential_complement,
+    residential_city,
+    residential_state,
+    residential_zip_code,
+    // ...otherData
+  } = personData;
 
   if (!document_type || !document) {
     if (name || email || phone_number) {
@@ -25,7 +37,6 @@ async function findOrCreatePerson(personData, connection) {
   }
 
   try {
-    // 1. Try to find existing person by document using the transaction connection
     let existingPerson = await PersonModel.getPersonByDocument(
       document_type,
       document,
@@ -33,7 +44,6 @@ async function findOrCreatePerson(personData, connection) {
     );
 
     if (existingPerson) {
-      // 2. Person exists: Update IF name, email, or phone_number are explicitly provided in the input `personData`
       const updateData = {};
       if (personData.hasOwnProperty("name") && name !== undefined)
         updateData.name = name;
@@ -45,27 +55,68 @@ async function findOrCreatePerson(personData, connection) {
       )
         updateData.phone_number = phone_number;
 
+      if (personRole === "owner") {
+        if (
+          personData.hasOwnProperty("residential_street") &&
+          residential_street !== undefined
+        )
+          updateData.residential_street = residential_street;
+        if (
+          personData.hasOwnProperty("residential_house_number") &&
+          residential_house_number !== undefined
+        )
+          updateData.residential_house_number = residential_house_number;
+        if (
+          personData.hasOwnProperty("residential_neighborhood") &&
+          residential_neighborhood !== undefined
+        )
+          updateData.residential_neighborhood = residential_neighborhood;
+        if (
+          personData.hasOwnProperty("residential_complement") &&
+          residential_complement !== undefined
+        ) {
+          updateData.residential_complement = residential_complement;
+        } else if (
+          personData.hasOwnProperty("residential_complement") &&
+          personData.residential_complement === null
+        ) {
+          updateData.residential_complement = null;
+        }
+        if (
+          personData.hasOwnProperty("residential_city") &&
+          residential_city !== undefined
+        )
+          updateData.residential_city = residential_city;
+        if (
+          personData.hasOwnProperty("residential_state") &&
+          residential_state !== undefined
+        )
+          updateData.residential_state = residential_state;
+        if (
+          personData.hasOwnProperty("residential_zip_code") &&
+          residential_zip_code !== undefined
+        )
+          updateData.residential_zip_code = residential_zip_code;
+      }
+
       if (Object.keys(updateData).length > 0) {
         await PersonModel.updatePerson(
           existingPerson.id,
           updateData,
           connection
         );
-      } else {
       }
       return existingPerson.id;
     } else {
-      // 3. Person doesn't exist? Create a new person
       if (
         name === undefined ||
         email === undefined ||
         phone_number === undefined
       ) {
-        console.error("Missing required fields for creating new person:", {
-          name,
-          email,
-          phone_number,
-        });
+        console.error(
+          "Missing required fields (name, email, phone) for creating new person:",
+          { name, email, phone_number, document_type, document }
+        );
         throw new Error(
           "Name, email, and phone number are required to create a new person when document is not found."
         );
@@ -77,14 +128,29 @@ async function findOrCreatePerson(personData, connection) {
         document,
         email,
         phone_number,
+        personRole === "owner" ? residential_street : null,
+        personRole === "owner" ? residential_house_number : null,
+        personRole === "owner" ? residential_neighborhood : null,
+        personRole === "owner" ? residential_complement : null,
+        personRole === "owner" ? residential_city : null,
+        personRole === "owner" ? residential_state : null,
+        personRole === "owner" ? residential_zip_code : null,
         connection
       );
-      console.log(`Created new person with ID: ${newPerson.id}`);
+
+      if (!newPerson || newPerson.id === undefined) {
+        console.error(
+          "PersonModel.createPerson did not return a valid person object with an ID."
+        );
+        throw new Error(
+          "Failed to create person record due to internal model error."
+        );
+      }
       return newPerson.id;
     }
   } catch (error) {
     console.error(
-      `Error during findOrCreatePerson for document ${document_type} / ${document}:`,
+      `Error during findOrCreatePerson for document ${document_type} / ${document} (Role: ${personRole}):`,
       error
     );
     throw error;
@@ -97,70 +163,108 @@ async function createProperty(propertyData) {
   try {
     await connection.beginTransaction();
 
-    const { owner, possessor, executor, ...otherPropertyData } = propertyData;
+    const {
+      owner,
+      possessor,
+      executor,
+      logradouro_code,
+      secao_code,
+      ...otherPropertyData
+    } = propertyData;
 
-    // --- 1. Create Owner (Always Required) ---
-    const ownerId = await findOrCreatePerson(owner, connection);
-
-    // --- 2. Create Possessor (Optional) ---
-    let possessorId = null;
-    if (possessor) {
-      possessorId = await findOrCreatePerson(possessor, connection);
+    // --- Basic service-level validation for new NOT NULL fields ---
+    if (!logradouro_code) {
+      await connection.rollback();
+      connection.release();
+      throw new Error("Logradouro code is required for property creation.");
+    }
+    if (!secao_code) {
+      await connection.rollback();
+      connection.release();
+      throw new Error("Seção code is required for property creation.");
     }
 
-    // --- 3. Create Executor (Optional) ---
-    let executorId = null;
-    if (executor) {
-      executorId = await findOrCreatePerson(executor, connection);
+    // --- 1. Handle People ---
+    const ownerId = await findOrCreatePerson(owner, "owner", connection);
+    if (!ownerId) {
+      await connection.rollback();
+      connection.release();
+      throw new Error("Failed to process owner for property creation.");
     }
+    let possessorId = possessor
+      ? await findOrCreatePerson(possessor, "possessor", connection)
+      : null;
+    let executorId = executor
+      ? await findOrCreatePerson(executor, "executor", connection)
+      : null;
 
     // --- 4. Create the Property ---
-    const newProperty = await PropertyModel.createProperty(
-      otherPropertyData,
+    const propertyModelData = {
+      ...otherPropertyData,
+      logradouro_code,
+      secao_code,
+    };
+    const newPropertyResult = await PropertyModel.createProperty(
+      propertyModelData,
       connection
     );
+    const newPropertyId = newPropertyResult.id;
 
     // --- 5. Link relationships ---
     await PropertyModel.linkPropertyToPerson(
-      newProperty.id,
+      newPropertyId,
       ownerId,
       "owner",
-      null,
+      owner?.description,
       connection
     );
     if (possessorId) {
       await PropertyModel.linkPropertyToPerson(
-        newProperty.id,
+        newPropertyId,
         possessorId,
         "possessor",
-        possessor.description,
+        possessor?.description,
         connection
       );
     }
     if (executorId) {
       await PropertyModel.linkPropertyToPerson(
-        newProperty.id,
+        newPropertyId,
         executorId,
         "executor",
-        executor.description,
+        executor?.description,
         connection
       );
     }
 
     await connection.commit();
-    return {
-      id: newProperty.id,
-      ...otherPropertyData,
-      owner: { id: ownerId, ...owner },
-      possessor: possessorId ? { id: possessorId, ...possessor } : null,
-      executor: executorId ? { id: executorId, ...executor } : null,
-    };
+
+    const fullNewProperty = await getPropertyById(newPropertyId);
+    return fullNewProperty;
   } catch (error) {
-    await connection.rollback();
-    console.error("Transaction rolled back:", error);
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("Error during rollback:", rollbackError);
+      }
+    }
+    console.error("Error in service createProperty:", error);
     throw error;
   } finally {
-    connection.release();
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      connection.release();
+    }
   }
 }
 
@@ -192,22 +296,18 @@ async function getPropertyById(propertyId) {
 
 // --- getAllProperties ---
 async function getAllProperties() {
-  // 1. Fetch all base properties (Query 1)
   const properties = await PropertyModel.getAllProperties();
 
   if (!properties || properties.length === 0) {
     return [];
   }
 
-  // 2. Extract all property IDs
   const propertyIds = properties.map((p) => p.id);
 
-  // 3. Fetch all related people for these properties in one go (Query 2)
   const allRelatedPeople = await PropertyModel.getPeopleForPropertyIds(
     propertyIds
   );
 
-  // 4. Map people to their respective properties efficiently
   const peopleMap = new Map();
   allRelatedPeople.forEach((person) => {
     const propId = person.property_id;
@@ -241,7 +341,6 @@ async function getAllProperties() {
     }
   });
 
-  // 5. Combine property data with the mapped people data
   const propertiesWithPeople = properties.map((property) => {
     const related = peopleMap.get(property.id) || {
       owners: [],
@@ -265,7 +364,6 @@ async function updateProperty(propertyId, propertyData) {
   try {
     await connection.beginTransaction();
 
-    // 1. Check if Property Exists
     const existingProperty = await PropertyModel.getPropertyById(propertyId);
     if (!existingProperty) {
       throw new Error("Propriedade não encontrada.");
@@ -273,7 +371,6 @@ async function updateProperty(propertyId, propertyData) {
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
-    // 2. Determine Target Person IDs using findOrCreatePerson
     let targetOwnerId = null;
     let targetPossessorId = null;
     let targetExecutorId = null;
@@ -287,7 +384,7 @@ async function updateProperty(propertyId, propertyData) {
         console.error("Attempt to remove owner during update is not allowed.");
         throw new Error("Property must have an owner.");
       } else {
-        targetOwnerId = await findOrCreatePerson(owner, connection);
+        targetOwnerId = await findOrCreatePerson(owner, "owner", connection);
         ownerDescription = owner?.description;
         if (!targetOwnerId) {
           throw new Error("Failed to process owner information.");
@@ -311,7 +408,11 @@ async function updateProperty(propertyId, propertyData) {
       if (possessor === null) {
         targetPossessorId = null;
       } else {
-        targetPossessorId = await findOrCreatePerson(possessor, connection);
+        targetPossessorId = await findOrCreatePerson(
+          possessor,
+          "possessor",
+          connection
+        );
         if (!targetPossessorId) {
           throw new Error("Failed to process possessor information.");
         }
@@ -329,7 +430,11 @@ async function updateProperty(propertyId, propertyData) {
       if (executor === null) {
         targetExecutorId = null;
       } else {
-        targetExecutorId = await findOrCreatePerson(executor, connection);
+        targetExecutorId = await findOrCreatePerson(
+          executor,
+          "executor",
+          connection
+        );
         if (!targetExecutorId) {
           throw new Error("Failed to process executor information.");
         }
@@ -343,14 +448,17 @@ async function updateProperty(propertyId, propertyData) {
     }
 
     // 3. Prepare Property Data for Update
-    const dataToUpdate = { ...otherPropertyData };
+    const dataToUpdateModel = { ...otherPropertyData };
+
     if (propertyData.hasOwnProperty("front_photo"))
-      dataToUpdate.front_photo = propertyData.front_photo;
+      dataToUpdateModel.front_photo = propertyData.front_photo;
     if (propertyData.hasOwnProperty("above_photo"))
-      dataToUpdate.above_photo = propertyData.above_photo;
+      dataToUpdateModel.above_photo = propertyData.above_photo;
 
     const finalPropertyUpdateData = Object.fromEntries(
-      Object.entries(dataToUpdate).filter(([key, value]) => value !== undefined)
+      Object.entries(dataToUpdateModel).filter(
+        ([_, value]) => value !== undefined
+      )
     );
 
     // 4. Update Property Details (SINGLE CALL)
@@ -360,13 +468,11 @@ async function updateProperty(propertyId, propertyData) {
         finalPropertyUpdateData,
         connection
       );
-    } else {
     }
 
     // 5. Update Relationships (Remove all and Re-add)
     await PropertyModel.removePropertyPeople(propertyId, connection);
 
-    // Link Target Owner
     if (!targetOwnerId)
       throw new Error("Consistency Error: Owner ID is missing before linking.");
     await PropertyModel.linkPropertyToPerson(
@@ -377,7 +483,6 @@ async function updateProperty(propertyId, propertyData) {
       connection
     );
 
-    // Link Target Possessor (if exists)
     if (targetPossessorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
@@ -387,7 +492,6 @@ async function updateProperty(propertyId, propertyData) {
         connection
       );
     }
-    // Link Target Executor (if exists)
     if (targetExecutorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
@@ -399,16 +503,32 @@ async function updateProperty(propertyId, propertyData) {
     }
 
     await connection.commit();
-
-    // 6. Fetch and return the fully updated property representation
-    const updatedProperty = await getPropertyById(propertyId);
-    return updatedProperty;
+    const fullUpdatedProperty = await getPropertyById(propertyId);
+    return fullUpdatedProperty;
   } catch (error) {
-    await connection.rollback();
-    console.error("Transaction rolled back (UPDATE):", error);
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("Error during rollback (UPDATE):", rollbackError);
+      }
+    }
+    console.error("Error in service updateProperty:", error);
     throw error;
   } finally {
-    connection.release();
+    if (
+      connection &&
+      connection.connection &&
+      !connection.connection._fatalError &&
+      !connection.connection._closing
+    ) {
+      connection.release();
+    }
   }
 }
 
@@ -417,7 +537,6 @@ async function deleteProperty(propertyId) {
   try {
     await connection.beginTransaction();
 
-    // 1. Retrieve associated people BEFORE deleting the property
     const people = await PropertyModel.getPeopleByPropertyId(propertyId);
     const owner = people.find((p) => p.relationship_type === "owner");
     const possessor = people.find((p) => p.relationship_type === "possessor");
@@ -428,11 +547,9 @@ async function deleteProperty(propertyId) {
       throw new Error("Property not found");
     }
 
-    // 2. Delete the property and its links (existing logic)
     await PropertyModel.removePropertyPeople(propertyId, connection);
     await PropertyModel.deleteProperty(propertyId, connection);
 
-    // 3. and 4. Check for remaining associations and delete people if necessary
     async function checkAndDeletePerson(person) {
       if (person) {
         const remainingAssociations =

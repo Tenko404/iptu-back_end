@@ -32,4 +32,4 @@ const upload = multer({
   },
 });
 
-export default upload; // Export multer instance
+export default upload;

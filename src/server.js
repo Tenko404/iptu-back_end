@@ -15,13 +15,10 @@ const app = express();
 
 // --- Middleware ---
 
-// CORS
 app.use(cors());
 
-// Parse JSON request bodies
 app.use(express.json());
 
-// Parse URL-encoded request bodies (for form data)
 app.use(express.urlencoded({ extended: true }));
 
 /*

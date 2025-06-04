@@ -1,7 +1,6 @@
 import pool from "../config/db.js";
 
 // --- createProperty ---
-// Creates a new property in the db
 async function createProperty(propertyData, connection) {
   const {
     street,
@@ -9,6 +8,8 @@ async function createProperty(propertyData, connection) {
     neighborhood,
     complement,
     property_registration,
+    logradouro_code,
+    secao_code,
     tax_type,
     land_area,
     built_area,
@@ -16,11 +17,17 @@ async function createProperty(propertyData, connection) {
     above_photo,
   } = propertyData;
 
+  const db = connection || pool;
+
   try {
-    const [result] = await connection.query(
+    const [result] = await db.query(
       `
-      INSERT INTO properties (street, house_number, neighborhood, complement, property_registration, tax_type, land_area, built_area, front_photo, above_photo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO properties (
+        street, house_number, neighborhood, complement,
+        property_registration, logradouro_code, secao_code, tax_type,
+        land_area, built_area, front_photo, above_photo
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         street,
@@ -28,6 +35,8 @@ async function createProperty(propertyData, connection) {
         neighborhood,
         complement,
         property_registration,
+        logradouro_code,
+        secao_code,
         tax_type,
         land_area,
         built_area,
@@ -36,7 +45,12 @@ async function createProperty(propertyData, connection) {
       ]
     );
 
-    return { id: result.insertId };
+    return {
+      id: result.insertId,
+      property_registration,
+      logradouro_code,
+      secao_code,
+    };
   } catch (error) {
     console.error("Error in createProperty:", error);
     throw error;
@@ -44,7 +58,6 @@ async function createProperty(propertyData, connection) {
 }
 
 // --- getPropertyById ---
-// Retrieves property by its ID
 async function getPropertyById(id) {
   try {
     const [rows] = await pool.query("SELECT * FROM properties WHERE id = ?", [
@@ -58,7 +71,6 @@ async function getPropertyById(id) {
 }
 
 // --- getAllProperties ---
-// Retrieves all properties from db
 async function getAllProperties() {
   try {
     const [rows] = await pool.query("SELECT * FROM properties");
@@ -70,7 +82,6 @@ async function getAllProperties() {
 }
 
 // --- updateProperty ---
-// Updates a property in the db
 async function updateProperty(id, propertyData, connection) {
   const db = connection || pool;
   const validData = Object.fromEntries(
@@ -84,13 +95,10 @@ async function updateProperty(id, propertyData, connection) {
     return { affectedRows: 0 };
   }
 
-  // Build SET clause
   const setClause = fields.map((field) => `${field} = ?`).join(", ");
 
-  // Get corresponding values
   const values = fields.map((field) => validData[field]);
 
-  // Add property ID for the WHERE clause
   values.push(id);
 
   const sql = `UPDATE properties SET ${setClause} WHERE id = ?`;
@@ -105,7 +113,6 @@ async function updateProperty(id, propertyData, connection) {
 }
 
 // --- deleteProperty ---
-// Deletes a property from the db
 async function deleteProperty(propertyId, connection) {
   try {
     const [result] = await connection.query(
@@ -120,7 +127,6 @@ async function deleteProperty(propertyId, connection) {
 }
 
 // --- linkPropertyToPerson ---
-// Links property to person with a specific relationship type and description
 async function linkPropertyToPerson(
   propertyId,
   personId,
@@ -141,14 +147,17 @@ async function linkPropertyToPerson(
 }
 
 // --- getPeopleByPropertyId ---
-// Retrieves people linked to a specific property
 async function getPeopleByPropertyId(propertyId) {
   try {
     const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.document, p.document_type, pp.relationship_type, pp.description
-        FROM people p
-        INNER JOIN property_people pp ON p.id = pp.person_id
-        WHERE pp.property_id = ?`,
+      `SELECT
+        p.id, p.name, p.document, p.document_type, p.email, p.phone_number,
+        p.residential_street, p.residential_house_number, p.residential_neighborhood,
+        p.residential_complement, p.residential_city, p.residential_state, p.residential_zip_code,
+        pp.relationship_type, pp.description
+          FROM people p
+          INNER JOIN property_people pp ON p.id = pp.person_id
+          WHERE pp.property_id = ?`,
       [propertyId]
     );
     return rows;
@@ -159,7 +168,6 @@ async function getPeopleByPropertyId(propertyId) {
 }
 
 // --- removePropertyPeople ---
-// Removes the link between a property and a person
 async function removePropertyPeople(propertyId, connection) {
   try {
     const [result] = await connection.query(
@@ -174,7 +182,6 @@ async function removePropertyPeople(propertyId, connection) {
 }
 
 // --- propertyExists ---
-// Delete the relationship between a property and a person
 async function propertyExists(propertyId) {
   try {
     const [rows] = await pool.query("SELECT 1 FROM properties WHERE id = ?", [
@@ -188,7 +195,6 @@ async function propertyExists(propertyId) {
 }
 
 // --- getPropertiesByPersonId ---
-// Retrieves properties linked to a specific person
 async function getPropertiesByPersonId(personId, connection) {
   try {
     const [rows] = await connection.query(
@@ -206,14 +212,11 @@ async function getPropertiesByPersonId(personId, connection) {
 }
 
 // --- getPeopleForPropertyIds ---
-// Handles empty list to avoid invalid SQL
 async function getPeopleForPropertyIds(propertyIds) {
   if (!propertyIds || propertyIds.length === 0) {
     return [];
   }
 
-  // Handle the case where propertyIds is an empty array
-  // Create placeholders for the SQL query
   const placeholders = propertyIds.map(() => "?").join(",");
   const sql = `
     SELECT
