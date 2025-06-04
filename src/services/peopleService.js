@@ -44,13 +44,13 @@ async function getAllPeople() {
 }
 
 async function updatePerson(personId, personData) {
-  // 1. Check if the person exists
+  // Check if the person exists
   const personExists = await PersonModel.getPersonById(personId);
   if (!personExists) {
     throw new Error("Person not found");
   }
 
-  // 2. Check for document conflicts IF document details are being updated
+  // Check for document conflicts IF document details are being updated
   const { document_type, document } = personData;
   if (document_type && document) {
     const existingPersonWithDoc = await PersonModel.getPersonByDocument(
@@ -62,7 +62,7 @@ async function updatePerson(personId, personData) {
     }
   }
 
-  // 3. Prepare data for the model
+  // Prepare data for the model
   const dataToUpdate = Object.fromEntries(
     Object.entries(personData).filter(([_, value]) => value !== undefined)
   );
@@ -74,17 +74,17 @@ async function updatePerson(personId, personData) {
   }
 */
 
-  // 4. Call the updated model function
+  // Call the updated model function
   const result = await PersonModel.updatePerson(personId, dataToUpdate);
 
-  // 5. Check if update actually occurred
+  // Check if update actually occurred
   /*
   if (result.affectedRows === 0) {
     console.warn(`Update operation affected 0 rows for person ID: ${personId}`);
   }
 */
 
-  // 6. Return updated person data
+  // Return updated person data
   const updatedPerson = await PersonModel.getPersonById(personId);
   return updatedPerson;
 }

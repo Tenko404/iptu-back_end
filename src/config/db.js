@@ -1,9 +1,8 @@
-import mysql from "mysql2/promise"; // Promise-based version
+import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 
-dotenv.config(); // Load .env
+dotenv.config();
 
-// Connection pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -18,13 +17,13 @@ async function testConnection() {
   try {
     const connection = await pool.getConnection();
     console.log("Database conectada com sucesso!");
-    connection.release(); // Release connection back to pool
+    connection.release();
   } catch (error) {
     console.error("Conexão com a database falhou:", error);
-    process.exit(1); // Exit process if database connection fails
+    process.exit(1);
   }
 }
 
 testConnection();
 
-export default pool; // Export connection pool
+export default pool;
