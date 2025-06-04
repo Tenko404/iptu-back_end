@@ -146,13 +146,10 @@ async function updatePerson(id, personData, connection) {
     return { affectedRows: 0 };
   }
 
-  // Build SET part of the query
   const setClause = fields.map((field) => `${field} = ?`).join(", ");
 
-  // Get values in correct order
   const values = fields.map((field) => validData[field]);
 
-  // Add persons ID to the end of the values array
   values.push(id);
 
   const sql = `UPDATE people SET ${setClause} WHERE id = ?`;

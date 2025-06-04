@@ -296,22 +296,18 @@ async function getPropertyById(propertyId) {
 
 // --- getAllProperties ---
 async function getAllProperties() {
-  // 1. Fetch all base properties (Query 1)
   const properties = await PropertyModel.getAllProperties();
 
   if (!properties || properties.length === 0) {
     return [];
   }
 
-  // 2. Extract all property IDs
   const propertyIds = properties.map((p) => p.id);
 
-  // 3. Fetch all related people for these properties in one go (Query 2)
   const allRelatedPeople = await PropertyModel.getPeopleForPropertyIds(
     propertyIds
   );
 
-  // 4. Map people to their respective properties efficiently
   const peopleMap = new Map();
   allRelatedPeople.forEach((person) => {
     const propId = person.property_id;
@@ -345,7 +341,6 @@ async function getAllProperties() {
     }
   });
 
-  // 5. Combine property data with the mapped people data
   const propertiesWithPeople = properties.map((property) => {
     const related = peopleMap.get(property.id) || {
       owners: [],
@@ -369,7 +364,6 @@ async function updateProperty(propertyId, propertyData) {
   try {
     await connection.beginTransaction();
 
-    // 1. Check if Property Exists
     const existingProperty = await PropertyModel.getPropertyById(propertyId);
     if (!existingProperty) {
       throw new Error("Propriedade não encontrada.");
@@ -377,7 +371,6 @@ async function updateProperty(propertyId, propertyData) {
 
     const { owner, possessor, executor, ...otherPropertyData } = propertyData;
 
-    // 2. Determine Target Person IDs using findOrCreatePerson
     let targetOwnerId = null;
     let targetPossessorId = null;
     let targetExecutorId = null;
@@ -480,7 +473,6 @@ async function updateProperty(propertyId, propertyData) {
     // 5. Update Relationships (Remove all and Re-add)
     await PropertyModel.removePropertyPeople(propertyId, connection);
 
-    // Link Target Owner
     if (!targetOwnerId)
       throw new Error("Consistency Error: Owner ID is missing before linking.");
     await PropertyModel.linkPropertyToPerson(
@@ -491,7 +483,6 @@ async function updateProperty(propertyId, propertyData) {
       connection
     );
 
-    // Link Target Possessor (if exists)
     if (targetPossessorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
@@ -501,7 +492,6 @@ async function updateProperty(propertyId, propertyData) {
         connection
       );
     }
-    // Link Target Executor (if exists)
     if (targetExecutorId) {
       await PropertyModel.linkPropertyToPerson(
         propertyId,
@@ -547,7 +537,6 @@ async function deleteProperty(propertyId) {
   try {
     await connection.beginTransaction();
 
-    // 1. Retrieve associated people BEFORE deleting the property
     const people = await PropertyModel.getPeopleByPropertyId(propertyId);
     const owner = people.find((p) => p.relationship_type === "owner");
     const possessor = people.find((p) => p.relationship_type === "possessor");
@@ -558,11 +547,9 @@ async function deleteProperty(propertyId) {
       throw new Error("Property not found");
     }
 
-    // 2. Delete the property and its links (existing logic)
     await PropertyModel.removePropertyPeople(propertyId, connection);
     await PropertyModel.deleteProperty(propertyId, connection);
 
-    // 3. and 4. Check for remaining associations and delete people if necessary
     async function checkAndDeletePerson(person) {
       if (person) {
         const remainingAssociations =
